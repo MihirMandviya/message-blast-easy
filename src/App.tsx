@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
 import DashboardLayout from "@/components/DashboardLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -14,6 +15,8 @@ import SendMessage from "./pages/SendMessage";
 import MessageHistory from "./pages/MessageHistory";
 import SettingsPage from "./pages/SettingsPage";
 import UserManagement from "./pages/UserManagement";
+import SupportTickets from "./pages/SupportTickets";
+import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,11 +58,29 @@ const App = () => (
                 </DashboardLayout>
               </ProtectedRoute>
             } />
-            <Route path="/users" element={
+            <Route path="/support" element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <UserManagement />
+                  <SupportTickets />
                 </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <DashboardLayout>
+                    <AdminDashboard />
+                  </DashboardLayout>
+                </AdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <AdminRoute>
+                  <DashboardLayout>
+                    <UserManagement />
+                  </DashboardLayout>
+                </AdminRoute>
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
