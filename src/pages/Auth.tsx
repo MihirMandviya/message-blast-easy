@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Users, Zap, Shield, BarChart3, Phone, Mail, Lock } from 'lucide-react';
+import { MessageSquare, Users, Zap, Shield, BarChart3, Phone, Mail, Lock, UserCog } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
@@ -14,6 +14,7 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isAdminLogin, setIsAdminLogin] = useState(false);
   const { signIn, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -142,7 +143,20 @@ const Auth = () => {
       </div>
       
       {/* Right Side - Login Form */}
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white px-4 py-12">
+      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-gray-50 to-white px-4 py-12 relative">
+        {/* Admin Login Toggle */}
+        <div className="absolute top-4 right-4">
+          <Button
+            variant={isAdminLogin ? "default" : "outline"}
+            size="sm"
+            onClick={() => setIsAdminLogin(!isAdminLogin)}
+            className="flex items-center gap-2"
+          >
+            <UserCog className="h-4 w-4" />
+            {isAdminLogin ? 'Client Login' : 'Admin Login'}
+          </Button>
+        </div>
+        
         <div className="w-full max-w-md">
           {/* Mobile Header */}
           <div className="lg:hidden text-center mb-8">
@@ -162,9 +176,14 @@ const Auth = () => {
                   <MessageSquare className="h-8 w-8 text-white" />
                 </div>
               </div>
-              <CardTitle className="text-2xl gradient-text mb-2">Welcome Back</CardTitle>
+              <CardTitle className="text-2xl gradient-text mb-2">
+                {isAdminLogin ? 'Admin Login' : 'Welcome Back'}
+              </CardTitle>
               <CardDescription className="text-base">
-                Sign in to access your WhatsApp Business Dashboard
+                {isAdminLogin 
+                  ? 'Sign in to access the admin dashboard and manage clients' 
+                  : 'Sign in to access your WhatsApp Business Dashboard'
+                }
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -242,7 +261,9 @@ const Auth = () => {
           
           {/* Demo Credentials */}
           <div className="mt-6 p-4 bg-info/10 rounded-lg border border-info/20">
-            <h3 className="font-medium text-info mb-2">Demo Credentials:</h3>
+            <h3 className="font-medium text-info mb-2">
+              {isAdminLogin ? 'Admin Credentials:' : 'Demo Credentials:'}
+            </h3>
             <p className="text-sm text-info/80">
               <strong>Email:</strong> admin@gmail.com<br />
               <strong>Password:</strong> admin@123

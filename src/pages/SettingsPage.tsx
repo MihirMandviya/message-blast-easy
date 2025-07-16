@@ -8,6 +8,7 @@ import { Settings, Phone, Key, Save, Check, User, Building2, MessageSquare, Shie
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 
 const SettingsPage = () => {
   const [apiKey, setApiKey] = useState('');
@@ -17,6 +18,7 @@ const SettingsPage = () => {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { isAdmin } = useUserRole();
 
   // Load user profile on mount
   useEffect(() => {
@@ -48,15 +50,13 @@ const SettingsPage = () => {
   }, [user]);
 
   const handleSaveSettings = async () => {
-    if (!user) return;
+    if (!user || !isAdmin) return;
 
     setLoading(true);
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
-          whatsapp_api_key: apiKey,
-          whatsapp_number: phoneNumber,
           business_name: businessName,
         })
         .eq('user_id', user.id);
@@ -65,7 +65,7 @@ const SettingsPage = () => {
 
       toast({
         title: "Settings saved successfully!",
-        description: "Your WhatsApp configuration has been updated.",
+        description: "Your business information has been updated.",
       });
     } catch (error) {
       toast({
@@ -135,13 +135,13 @@ const SettingsPage = () => {
                   <Input
                     id="apiKey"
                     type="password"
-                    placeholder="Enter your WhatsApp API key"
+                    placeholder="Your WhatsApp API key"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    className="h-12 border-2 border-gray-200 focus:border-primary transition-all duration-200"
+                    disabled
+                    className="h-12 border-2 border-gray-200 bg-gray-50"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Your API key is encrypted and stored securely
+                    API key is managed by your administrator
                   </p>
                 </div>
                 
@@ -153,13 +153,13 @@ const SettingsPage = () => {
                   <Input
                     id="phoneNumber"
                     type="tel"
-                    placeholder="e.g., +1234567890"
+                    placeholder="Your WhatsApp number"
                     value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="h-12 border-2 border-gray-200 focus:border-primary transition-all duration-200"
+                    disabled
+                    className="h-12 border-2 border-gray-200 bg-gray-50"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Include country code (e.g., +91 for India)
+                    WhatsApp number is managed by your administrator
                   </p>
                 </div>
 
@@ -235,7 +235,7 @@ const SettingsPage = () => {
           </TabsContent>
         </Tabs>
         
-        {/* Save Button */}
+        {/* Save Button - Only show for business name changes */}
         <div className="flex justify-end pt-6">
           <Button 
             onClick={handleSaveSettings}
@@ -250,7 +250,7 @@ const SettingsPage = () => {
             ) : (
               <>
                 <Save className="h-5 w-5 mr-2" />
-                Save Settings
+                Save Business Info
               </>
             )}
           </Button>

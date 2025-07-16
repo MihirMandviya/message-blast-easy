@@ -3,14 +3,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useToast } from '@/components/ui/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Users, Plus } from 'lucide-react';
+import { Loader2, Users, Plus, Phone, Key } from 'lucide-react';
 
 export default function UserManagement() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [whatsappApiKey, setWhatsappApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
@@ -31,15 +33,33 @@ export default function UserManagement() {
         throw error;
       }
 
+      // Update the profile with WhatsApp details
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            whatsapp_number: whatsappNumber,
+            whatsapp_api_key: whatsappApiKey,
+            business_name: businessName || 'My Business'
+          })
+          .eq('user_id', data.user.id);
+
+        if (profileError) {
+          console.error('Error updating profile:', profileError);
+        }
+      }
+
       toast({
-        title: "User Created Successfully",
-        description: `User ${email} has been created with ID: ${data.user.id}`,
+        title: "Client Created Successfully",
+        description: `Client ${email} has been created with WhatsApp integration`,
       });
 
       // Clear form
       setEmail('');
       setPassword('');
       setBusinessName('');
+      setWhatsappNumber('');
+      setWhatsappApiKey('');
 
     } catch (error: any) {
       toast({
@@ -53,23 +73,25 @@ export default function UserManagement() {
   };
 
   const createTestUser = async () => {
-    setEmail('admin@test.com');
+    setEmail('client@test.com');
     setPassword('password123');
     setBusinessName('Test Business');
+    setWhatsappNumber('+1234567890');
+    setWhatsappApiKey('test-api-key-123');
   };
 
   return (
     <div className="container mx-auto p-6 max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
         <Users className="h-8 w-8 text-primary" />
-        <h1 className="text-3xl font-bold">User Management</h1>
+        <h1 className="text-3xl font-bold">Client Management</h1>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
-            Create New User
+            Create New Client
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -110,6 +132,34 @@ export default function UserManagement() {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="whatsappNumber" className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                WhatsApp Number
+              </Label>
+              <Input
+                id="whatsappNumber"
+                type="tel"
+                value={whatsappNumber}
+                onChange={(e) => setWhatsappNumber(e.target.value)}
+                placeholder="e.g., +1234567890"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="whatsappApiKey" className="flex items-center gap-2">
+                <Key className="h-4 w-4" />
+                WhatsApp API Key
+              </Label>
+              <Input
+                id="whatsappApiKey"
+                type="password"
+                value={whatsappApiKey}
+                onChange={(e) => setWhatsappApiKey(e.target.value)}
+                placeholder="Enter WhatsApp API key"
+              />
+            </div>
+
             <div className="flex gap-3">
               <Button type="submit" disabled={loading} className="flex-1">
                 {loading ? (
@@ -117,12 +167,12 @@ export default function UserManagement() {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...
                   </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create User
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Create Client
+                    </>
+                  )}
               </Button>
               
               <Button type="button" variant="outline" onClick={createTestUser}>
@@ -135,15 +185,17 @@ export default function UserManagement() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Quick Test User</CardTitle>
+          <CardTitle>Quick Test Client</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground mb-4">
-            For quick testing, you can create a user with these credentials:
+            For quick testing, you can create a client with these credentials:
           </p>
           <div className="bg-muted p-4 rounded-lg">
-            <p><strong>Email:</strong> admin@test.com</p>
+            <p><strong>Email:</strong> client@test.com</p>
             <p><strong>Password:</strong> password123</p>
+            <p><strong>WhatsApp Number:</strong> +1234567890</p>
+            <p><strong>API Key:</strong> test-api-key-123</p>
           </div>
         </CardContent>
       </Card>
