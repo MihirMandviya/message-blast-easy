@@ -4,12 +4,14 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AdminAuthProvider } from "@/hooks/useAdminAuth";
+import { ClientAuthProvider } from "@/hooks/useClientAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
 import DashboardLayout from "@/components/DashboardLayout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import AdminAuth from "./pages/AdminAuth";
 import Dashboard from "./pages/Dashboard";
 import SendMessage from "./pages/SendMessage";
 import MessageHistory from "./pages/MessageHistory";
@@ -20,6 +22,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import TemplateManagement from "./pages/TemplateManagement";
 import ContactManagement from "./pages/ContactManagement";
 import ScheduledMessages from "./pages/ScheduledMessages";
+import ClientManagement from "./pages/ClientManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,91 +30,103 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <Dashboard />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/send" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <SendMessage />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/messages" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <MessageHistory />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/settings" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <SettingsPage />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/support" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <SupportTickets />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/admin" element={
-              <ProtectedRoute>
+      <AdminAuthProvider>
+        <ClientAuthProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/admin-auth" element={<AdminAuth />} />
+              
+              {/* Client routes */}
+              <Route path="/" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Dashboard />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/send" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <SendMessage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/messages" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <MessageHistory />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/templates" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <TemplateManagement />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/contacts" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <ContactManagement />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/scheduled" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <ScheduledMessages />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/settings" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <SettingsPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/support" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <SupportTickets />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              
+              {/* Admin routes */}
+              <Route path="/admin" element={
                 <AdminRoute>
                   <DashboardLayout>
                     <AdminDashboard />
                   </DashboardLayout>
                 </AdminRoute>
-              </ProtectedRoute>
-            } />
-            <Route path="/users" element={
-              <ProtectedRoute>
+              } />
+              <Route path="/admin/clients" element={
+                <AdminRoute>
+                  <DashboardLayout>
+                    <ClientManagement />
+                  </DashboardLayout>
+                </AdminRoute>
+              } />
+              <Route path="/users" element={
                 <AdminRoute>
                   <DashboardLayout>
                     <UserManagement />
                   </DashboardLayout>
                 </AdminRoute>
-              </ProtectedRoute>
-            } />
-            <Route path="/templates" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <TemplateManagement />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/contacts" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <ContactManagement />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/scheduled" element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <ScheduledMessages />
-                </DashboardLayout>
-              </ProtectedRoute>
-            } />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+              } />
+              
+              {/* Catch all route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </ClientAuthProvider>
+      </AdminAuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
