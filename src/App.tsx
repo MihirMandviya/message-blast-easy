@@ -17,6 +17,9 @@ import SettingsPage from "./pages/SettingsPage";
 import UserManagement from "./pages/UserManagement";
 import SupportTickets from "./pages/SupportTickets";
 import AdminDashboard from "./pages/AdminDashboard";
+import TemplateManagement from "./pages/TemplateManagement";
+import ContactManagement from "./pages/ContactManagement";
+import ScheduledMessages from "./pages/ScheduledMessages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -81,6 +84,27 @@ const App = () => (
                     <UserManagement />
                   </DashboardLayout>
                 </AdminRoute>
+              </ProtectedRoute>
+            } />
+            <Route path="/templates" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <TemplateManagement />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/contacts" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ContactManagement />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/scheduled" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ScheduledMessages />
+                </DashboardLayout>
               </ProtectedRoute>
             } />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

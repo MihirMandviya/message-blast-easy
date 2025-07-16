@@ -14,6 +14,242 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaigns: {
+        Row: {
+          created_at: string
+          delivered_count: number | null
+          description: string | null
+          failed_count: number | null
+          id: string
+          message_content: string
+          message_type: string
+          name: string
+          scheduled_for: string | null
+          sent_count: number | null
+          status: string
+          target_groups: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivered_count?: number | null
+          description?: string | null
+          failed_count?: number | null
+          id?: string
+          message_content: string
+          message_type?: string
+          name: string
+          scheduled_for?: string | null
+          sent_count?: number | null
+          status?: string
+          target_groups?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          delivered_count?: number | null
+          description?: string | null
+          failed_count?: number | null
+          id?: string
+          message_content?: string
+          message_type?: string
+          name?: string
+          scheduled_for?: string | null
+          sent_count?: number | null
+          status?: string
+          target_groups?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      contact_groups: {
+        Row: {
+          added_at: string
+          contact_id: string
+          group_id: string
+          id: string
+        }
+        Insert: {
+          added_at?: string
+          contact_id: string
+          group_id: string
+          id?: string
+        }
+        Update: {
+          added_at?: string
+          contact_id?: string
+          group_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contact_groups_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contact_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          created_at: string
+          custom_fields: Json | null
+          email: string | null
+          id: string
+          name: string
+          notes: string | null
+          phone: string
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_fields?: Json | null
+          email?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          phone: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_fields?: Json | null
+          email?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      flow_steps: {
+        Row: {
+          conditions: Json | null
+          content: string
+          created_at: string
+          delay_hours: number | null
+          delay_minutes: number | null
+          flow_id: string
+          id: string
+          step_order: number
+          step_type: string
+        }
+        Insert: {
+          conditions?: Json | null
+          content: string
+          created_at?: string
+          delay_hours?: number | null
+          delay_minutes?: number | null
+          flow_id: string
+          id?: string
+          step_order: number
+          step_type?: string
+        }
+        Update: {
+          conditions?: Json | null
+          content?: string
+          created_at?: string
+          delay_hours?: number | null
+          delay_minutes?: number | null
+          flow_id?: string
+          id?: string
+          step_order?: number
+          step_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flow_steps_flow_id_fkey"
+            columns: ["flow_id"]
+            isOneToOne: false
+            referencedRelation: "flows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flows: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          trigger_conditions: Json | null
+          trigger_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          trigger_conditions?: Json | null
+          trigger_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          trigger_conditions?: Json | null
+          trigger_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      groups: {
+        Row: {
+          created_at: string
+          criteria: Json | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          criteria?: Json | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          criteria?: Json | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           created_at: string
@@ -83,6 +319,90 @@ export type Database = {
           user_id?: string
           whatsapp_api_key?: string | null
           whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
+      scheduled_messages: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          flow_id: string | null
+          id: string
+          message_content: string
+          message_type: string
+          recipient_name: string | null
+          recipient_phone: string
+          scheduled_for: string
+          sent_at: string | null
+          status: string
+          template_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          flow_id?: string | null
+          id?: string
+          message_content: string
+          message_type?: string
+          recipient_name?: string | null
+          recipient_phone: string
+          scheduled_for: string
+          sent_at?: string | null
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          flow_id?: string | null
+          id?: string
+          message_content?: string
+          message_type?: string
+          recipient_name?: string | null
+          recipient_phone?: string
+          scheduled_for?: string
+          sent_at?: string | null
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      templates: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+          variables: Json | null
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+          variables?: Json | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+          variables?: Json | null
         }
         Relationships: []
       }
