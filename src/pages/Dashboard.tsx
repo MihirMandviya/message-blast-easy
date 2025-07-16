@@ -9,6 +9,7 @@ import { MessageSquare, Users, Send, BarChart3, TrendingUp, CheckCircle, XCircle
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -49,6 +50,7 @@ const Dashboard = () => {
   const [quickMessage, setQuickMessage] = useState('');
   const [quickMessageType, setQuickMessageType] = useState('text');
   const { session } = useAuth();
+  const { isAdmin } = useUserRole();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -95,9 +97,14 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('status');
+      let query = supabase.from('messages').select('status');
+      
+      // If not admin, only show user's own messages
+      if (!isAdmin && session?.user?.id) {
+        query = query.eq('user_id', session.user.id);
+      }
+      
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -115,9 +122,14 @@ const Dashboard = () => {
 
   const fetchRecentMessages = async () => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
+      let query = supabase.from('messages').select('*');
+      
+      // If not admin, only show user's own messages
+      if (!isAdmin && session?.user?.id) {
+        query = query.eq('user_id', session.user.id);
+      }
+      
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -130,9 +142,14 @@ const Dashboard = () => {
 
   const fetchRecentContacts = async () => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('recipient_phone')
+      let query = supabase.from('messages').select('recipient_phone');
+      
+      // If not admin, only show user's own contacts
+      if (!isAdmin && session?.user?.id) {
+        query = query.eq('user_id', session.user.id);
+      }
+      
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -148,9 +165,14 @@ const Dashboard = () => {
 
   const fetchDailyStats = async () => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('created_at, status')
+      let query = supabase.from('messages').select('created_at, status');
+      
+      // If not admin, only show user's own messages
+      if (!isAdmin && session?.user?.id) {
+        query = query.eq('user_id', session.user.id);
+      }
+      
+      const { data, error } = await query
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
         .order('created_at', { ascending: true });
 
@@ -289,15 +311,28 @@ const Dashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight gradient-text">Dashboard</h2>
+          <h2 className="text-3xl font-bold tracking-tight gradient-text">
+            {isAdmin ? 'Admin Dashboard' : 'Dashboard'}
+          </h2>
           <p className="text-muted-foreground">
-            Overview of your WhatsApp messaging activity
+            {isAdmin 
+              ? 'Overview of all WhatsApp messaging activity and system management' 
+              : 'Overview of your WhatsApp messaging activity'
+            }
           </p>
         </div>
-        <Button onClick={() => navigate('/send')} className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg">
-          <Plus className="h-4 w-4" />
-          Send Message
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => navigate('/send')} className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg">
+            <Plus className="h-4 w-4" />
+            Send Message
+          </Button>
+          {isAdmin && (
+            <Button onClick={() => navigate('/users')} variant="outline" className="gap-2">
+              <Users className="h-4 w-4" />
+              Manage Clients
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards */}

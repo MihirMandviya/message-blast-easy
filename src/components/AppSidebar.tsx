@@ -23,7 +23,7 @@ const userItems = [
 
 const adminItems = [
   { title: "Admin Dashboard", url: "/admin", icon: Shield },
-  { title: "User Management", url: "/users", icon: UserPlus },
+  { title: "Client Management", url: "/users", icon: UserPlus },
 ];
 
 export function AppSidebar() {
