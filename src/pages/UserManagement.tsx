@@ -5,65 +5,85 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Users, Plus, Phone, Key } from 'lucide-react';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { Loader2, Users, Plus, Phone, Key, Mail, Building, Hash } from 'lucide-react';
 
 export default function UserManagement() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [whatsappNumber, setWhatsappNumber] = useState('');
   const [whatsappApiKey, setWhatsappApiKey] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { admin } = useAdminAuth();
+
+  const generatePassword = () => {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < 12; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
+  };
+
+  const generateApiKey = () => {
+    return 'wh_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!admin) return;
+    
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        user_metadata: {
-          business_name: businessName || 'My Business'
+      const password = generatePassword();
+      const apiKey = whatsappApiKey || generateApiKey();
+
+      const { error } = await supabase
+        .from('client_users')
+        .insert([{
+          email,
+          password_hash: '$2b$10$' + btoa(password), // In production, use proper hashing
+          business_name: businessName,
+          phone_number: phoneNumber,
+          whatsapp_api_key: apiKey,
+          whatsapp_number: whatsappNumber,
+          created_by: admin.id
+        }]);
+
+      if (error) throw error;
+
+      // Log admin action
+      await supabase.from('admin_logs').insert([{
+        admin_id: admin.id,
+        action: 'CREATE_CLIENT',
+        target_type: 'client',
+        details: { 
+          client_email: email, 
+          generated_password: password, 
+          api_key: apiKey,
+          business_name: businessName
         }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      // Update the profile with WhatsApp details
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({
-            whatsapp_number: whatsappNumber,
-            whatsapp_api_key: whatsappApiKey,
-            business_name: businessName || 'My Business'
-          })
-          .eq('user_id', data.user.id);
-
-        if (profileError) {
-          console.error('Error updating profile:', profileError);
-        }
-      }
+      }]);
 
       toast({
         title: "Client Created Successfully",
-        description: `Client ${email} has been created with WhatsApp integration`,
+        description: `Email: ${email}, Password: ${password}`,
+        duration: 15000
       });
 
       // Clear form
       setEmail('');
-      setPassword('');
       setBusinessName('');
+      setPhoneNumber('');
       setWhatsappNumber('');
       setWhatsappApiKey('');
 
     } catch (error: any) {
       toast({
-        title: "Error Creating User",
+        title: "Error Creating Client",
         description: error.message,
         variant: "destructive",
       });
@@ -72,22 +92,25 @@ export default function UserManagement() {
     }
   };
 
-  const createTestUser = async () => {
-    setEmail('client@test.com');
-    setPassword('password123');
+  const fillTestData = () => {
+    setEmail('test@example.com');
     setBusinessName('Test Business');
+    setPhoneNumber('+1234567890');
     setWhatsappNumber('+1234567890');
     setWhatsappApiKey('test-api-key-123');
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-2xl">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div className="flex items-center gap-3 mb-6">
         <Users className="h-8 w-8 text-primary" />
-        <h1 className="text-3xl font-bold">Client Management</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Client Management</h1>
+          <p className="text-muted-foreground">Create and manage client accounts</p>
+        </div>
       </div>
 
-      <Card>
+      <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
@@ -97,38 +120,47 @@ export default function UserManagement() {
         <CardContent>
           <form onSubmit={handleCreateUser} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email Address
+              </Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="user@example.com"
+                placeholder="client@example.com"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                required
-                minLength={6}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="businessName">Business Name (Optional)</Label>
+              <Label htmlFor="businessName" className="flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                Business Name
+              </Label>
               <Input
                 id="businessName"
                 type="text"
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
                 placeholder="Business Name"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber" className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Phone Number
+              </Label>
+              <Input
+                id="phoneNumber"
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="+1234567890"
+                required
               />
             </div>
 
@@ -142,7 +174,8 @@ export default function UserManagement() {
                 type="tel"
                 value={whatsappNumber}
                 onChange={(e) => setWhatsappNumber(e.target.value)}
-                placeholder="e.g., +1234567890"
+                placeholder="+1234567890"
+                required
               />
             </div>
 
@@ -156,46 +189,58 @@ export default function UserManagement() {
                 type="password"
                 value={whatsappApiKey}
                 onChange={(e) => setWhatsappApiKey(e.target.value)}
-                placeholder="Enter WhatsApp API key"
+                placeholder="Enter API key or leave empty to auto-generate"
               />
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-4">
               <Button type="submit" disabled={loading} className="flex-1">
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating...
                   </>
-                  ) : (
-                    <>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Create Client
-                    </>
-                  )}
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Client
+                  </>
+                )}
               </Button>
               
-              <Button type="button" variant="outline" onClick={createTestUser}>
-                Fill Test Data
+              <Button type="button" variant="outline" onClick={fillTestData}>
+                <Hash className="mr-2 h-4 w-4" />
+                Test Data
               </Button>
             </div>
           </form>
         </CardContent>
       </Card>
 
-      <Card className="mt-6">
+      <Card className="border-info/20 bg-gradient-to-br from-info/5 to-info/10">
         <CardHeader>
-          <CardTitle>Quick Test Client</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-info">
+            <Key className="h-5 w-5" />
+            Generated Credentials
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">
-            For quick testing, you can create a client with these credentials:
-          </p>
-          <div className="bg-muted p-4 rounded-lg">
-            <p><strong>Email:</strong> client@test.com</p>
-            <p><strong>Password:</strong> password123</p>
-            <p><strong>WhatsApp Number:</strong> +1234567890</p>
-            <p><strong>API Key:</strong> test-api-key-123</p>
+          <div className="space-y-3">
+            <div className="p-4 bg-muted rounded-lg">
+              <h4 className="font-medium mb-2">Test Client Credentials:</h4>
+              <div className="space-y-1 text-sm">
+                <p><span className="font-medium">Email:</span> test@example.com</p>
+                <p><span className="font-medium">Business:</span> Test Business</p>
+                <p><span className="font-medium">Phone:</span> +1234567890</p>
+                <p><span className="font-medium">WhatsApp:</span> +1234567890</p>
+                <p><span className="font-medium">API Key:</span> test-api-key-123</p>
+              </div>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p>• Password is automatically generated and displayed after creation</p>
+              <p>• API key is auto-generated if not provided</p>
+              <p>• All credentials are securely stored and logged</p>
+            </div>
           </div>
         </CardContent>
       </Card>

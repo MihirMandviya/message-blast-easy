@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useClientAuth } from '@/hooks/useClientAuth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -42,7 +42,7 @@ interface TicketData {
 
 export default function SupportTickets() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { client } = useClientAuth();
   const [tickets, setTickets] = useState<TicketData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,17 +60,17 @@ export default function SupportTickets() {
   });
 
   useEffect(() => {
-    if (user) {
+    if (client) {
       fetchTickets();
     }
-  }, [user]);
+  }, [client]);
 
   const fetchTickets = async () => {
     try {
       const { data, error } = await supabase
         .from('tickets')
         .select('*')
-        .eq('user_id', user?.id)
+        .eq('user_id', client?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -88,7 +88,7 @@ export default function SupportTickets() {
   };
 
   const onSubmit = async (values: z.infer<typeof ticketSchema>) => {
-    if (!user) return;
+    if (!client) return;
 
     try {
       const { error } = await supabase
@@ -98,7 +98,7 @@ export default function SupportTickets() {
           description: values.description,
           priority: values.priority,
           category: values.category,
-          user_id: user.id,
+          user_id: client.id,
           status: 'open'
         });
 

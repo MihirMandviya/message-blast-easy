@@ -288,4 +288,35 @@ All colors MUST be HSL.
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
   }
+
+  /* Fix dropdown transparency and z-index issues */
+  [data-radix-select-content] {
+    background-color: hsl(var(--background)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    z-index: 50 !important;
+  }
+
+  [data-radix-dropdown-menu-content] {
+    background-color: hsl(var(--background)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    z-index: 50 !important;
+  }
+
+  [data-radix-dialog-content] {
+    background-color: hsl(var(--background)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    z-index: 50 !important;
+  }
+
+  /* Fix select trigger styling */
+  [data-radix-select-trigger] {
+    background-color: hsl(var(--background)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+  }
+
+  /* Better hover states */
+  [data-radix-select-item]:hover,
+  [data-radix-dropdown-menu-item]:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
 }

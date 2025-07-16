@@ -38,8 +38,7 @@ const ClientManagement = () => {
     business_name: '',
     phone_number: '',
     whatsapp_api_key: '',
-    whatsapp_number: '',
-    subscription_plan: 'basic'
+    whatsapp_number: ''
   });
   const { toast } = useToast();
   const { admin } = useAdminAuth();
@@ -86,7 +85,7 @@ const ClientManagement = () => {
     if (!admin) return;
 
     const password = generatePassword();
-    const apiKey = generateApiKey();
+    const apiKey = newClient.whatsapp_api_key || generateApiKey();
 
     try {
       const { error } = await supabase
@@ -98,7 +97,6 @@ const ClientManagement = () => {
           phone_number: newClient.phone_number,
           whatsapp_api_key: apiKey,
           whatsapp_number: newClient.whatsapp_number,
-          subscription_plan: newClient.subscription_plan,
           created_by: admin.id
         }]);
 
@@ -114,7 +112,7 @@ const ClientManagement = () => {
 
       toast({
         title: "Success",
-        description: `Client created successfully. Password: ${password}`,
+        description: `Client created successfully. Email: ${newClient.email}, Password: ${password}`,
         duration: 10000
       });
 
@@ -124,8 +122,7 @@ const ClientManagement = () => {
         business_name: '',
         phone_number: '',
         whatsapp_api_key: '',
-        whatsapp_number: '',
-        subscription_plan: 'basic'
+        whatsapp_number: ''
       });
       fetchClients();
     } catch (error) {
@@ -149,7 +146,6 @@ const ClientManagement = () => {
           phone_number: editingClient.phone_number,
           whatsapp_api_key: editingClient.whatsapp_api_key,
           whatsapp_number: editingClient.whatsapp_number,
-          subscription_plan: editingClient.subscription_plan,
           is_active: editingClient.is_active
         })
         .eq('id', editingClient.id);
@@ -278,7 +274,7 @@ const ClientManagement = () => {
             <DialogHeader>
               <DialogTitle>Create New Client</DialogTitle>
               <DialogDescription>
-                Add a new client to the system. Password and API key will be generated automatically.
+                Add a new client to the system. Password will be generated automatically.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -311,6 +307,15 @@ const ClientManagement = () => {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="whatsapp_api_key">WhatsApp API Key</Label>
+                <Input
+                  id="whatsapp_api_key"
+                  value={newClient.whatsapp_api_key}
+                  onChange={(e) => setNewClient({ ...newClient, whatsapp_api_key: e.target.value })}
+                  placeholder="Enter API key or leave empty to auto-generate"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="whatsapp_number">WhatsApp Number</Label>
                 <Input
                   id="whatsapp_number"
@@ -318,19 +323,6 @@ const ClientManagement = () => {
                   onChange={(e) => setNewClient({ ...newClient, whatsapp_number: e.target.value })}
                   placeholder="+1234567890"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="subscription_plan">Subscription Plan</Label>
-                <Select value={newClient.subscription_plan} onValueChange={(value) => setNewClient({ ...newClient, subscription_plan: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="basic">Basic</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="enterprise">Enterprise</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               <Button onClick={handleCreateClient} className="w-full">
                 Create Client
@@ -354,7 +346,7 @@ const ClientManagement = () => {
                 <TableHead>Business Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Phone</TableHead>
-                <TableHead>Plan</TableHead>
+                <TableHead>WhatsApp Number</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Login</TableHead>
                 <TableHead>Actions</TableHead>
@@ -366,11 +358,7 @@ const ClientManagement = () => {
                   <TableCell className="font-medium">{client.business_name}</TableCell>
                   <TableCell>{client.email}</TableCell>
                   <TableCell>{client.phone_number}</TableCell>
-                  <TableCell>
-                    <Badge variant={client.subscription_plan === 'enterprise' ? 'default' : 'secondary'}>
-                      {client.subscription_plan}
-                    </Badge>
-                  </TableCell>
+                  <TableCell>{client.whatsapp_number || 'Not set'}</TableCell>
                   <TableCell>
                     <Badge variant={client.is_active ? 'default' : 'destructive'}>
                       {client.is_active ? 'Active' : 'Inactive'}
@@ -439,25 +427,20 @@ const ClientManagement = () => {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="edit_whatsapp_api_key">WhatsApp API Key</Label>
+                <Input
+                  id="edit_whatsapp_api_key"
+                  value={editingClient.whatsapp_api_key || ''}
+                  onChange={(e) => setEditingClient({ ...editingClient, whatsapp_api_key: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="edit_whatsapp_number">WhatsApp Number</Label>
                 <Input
                   id="edit_whatsapp_number"
                   value={editingClient.whatsapp_number || ''}
                   onChange={(e) => setEditingClient({ ...editingClient, whatsapp_number: e.target.value })}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_subscription_plan">Subscription Plan</Label>
-                <Select value={editingClient.subscription_plan} onValueChange={(value) => setEditingClient({ ...editingClient, subscription_plan: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="basic">Basic</SelectItem>
-                    <SelectItem value="premium">Premium</SelectItem>
-                    <SelectItem value="enterprise">Enterprise</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               <Button onClick={handleUpdateClient} className="w-full">
                 Update Client
