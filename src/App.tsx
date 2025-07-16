@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import SendMessage from "./pages/SendMessage";
 import SettingsPage from "./pages/SettingsPage";
+import UserManagement from "./pages/UserManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +44,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <SettingsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/users" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <UserManagement />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
