@@ -20,11 +20,7 @@ const clientItems = [
   { title: "Message History", url: "/messages", icon: History },
   { title: "Templates", url: "/templates", icon: LayoutTemplate },
   { title: "Contacts", url: "/contacts", icon: Users },
-  { title: "Groups", url: "/groups", icon: Layers },
-  { title: "Automation", url: "/flows", icon: Workflow },
   { title: "Scheduled", url: "/scheduled", icon: Clock },
-  { title: "Campaigns", url: "/campaigns", icon: Target },
-  { title: "Data Upload", url: "/upload", icon: Upload },
   { title: "Support", url: "/support", icon: HelpCircle },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
@@ -32,7 +28,8 @@ const clientItems = [
 const adminItems = [
   { title: "Admin Dashboard", url: "/admin", icon: Shield },
   { title: "Client Management", url: "/admin/clients", icon: UserPlus },
-  { title: "Support Tickets", url: "/admin/tickets", icon: HelpCircle },
+  { title: "User Management", url: "/users", icon: Users },
+  { title: "Support", url: "/support", icon: HelpCircle },
 ];
 
 export function AppSidebar() {

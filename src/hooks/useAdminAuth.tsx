@@ -42,19 +42,28 @@ export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const storedSession = localStorage.getItem('admin_session');
-    if (storedSession) {
-      try {
-        const parsedSession = JSON.parse(storedSession) as AdminSession;
-        setSession(parsedSession);
-        setAdmin(parsedSession.admin);
-      } catch (error) {
-        console.error('Error parsing stored session:', error);
-        localStorage.removeItem('admin_session');
+    const initializeAuth = async () => {
+      // Check for existing session
+      const storedSession = localStorage.getItem('admin_session');
+      if (storedSession) {
+        try {
+          const parsedSession = JSON.parse(storedSession) as AdminSession;
+          // Validate session is still valid
+          if (parsedSession.admin && parsedSession.token) {
+            setSession(parsedSession);
+            setAdmin(parsedSession.admin);
+          } else {
+            localStorage.removeItem('admin_session');
+          }
+        } catch (error) {
+          console.error('Error parsing stored session:', error);
+          localStorage.removeItem('admin_session');
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {

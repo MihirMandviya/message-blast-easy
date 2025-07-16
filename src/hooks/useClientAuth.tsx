@@ -48,19 +48,28 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const storedSession = localStorage.getItem('client_session');
-    if (storedSession) {
-      try {
-        const parsedSession = JSON.parse(storedSession) as ClientSession;
-        setSession(parsedSession);
-        setClient(parsedSession.client);
-      } catch (error) {
-        console.error('Error parsing stored session:', error);
-        localStorage.removeItem('client_session');
+    const initializeAuth = async () => {
+      // Check for existing session
+      const storedSession = localStorage.getItem('client_session');
+      if (storedSession) {
+        try {
+          const parsedSession = JSON.parse(storedSession) as ClientSession;
+          // Validate session is still valid
+          if (parsedSession.client && parsedSession.token) {
+            setSession(parsedSession);
+            setClient(parsedSession.client);
+          } else {
+            localStorage.removeItem('client_session');
+          }
+        } catch (error) {
+          console.error('Error parsing stored session:', error);
+          localStorage.removeItem('client_session');
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
   const signIn = async (email: string, password: string) => {
