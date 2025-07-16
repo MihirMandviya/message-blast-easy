@@ -29,6 +29,13 @@ All colors MUST be HSL.
     --accent: 263 70% 50%;
     --accent-foreground: 210 40% 98%;
 
+    /* Purple gradient colors */
+    --purple-start: 263 70% 50%;
+    --purple-mid: 263 70% 55%;
+    --purple-end: 263 70% 65%;
+    --purple-light: 263 70% 95%;
+    --purple-dark: 263 70% 35%;
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
@@ -67,6 +74,8 @@ All colors MUST be HSL.
     --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 71% 55%));
     --gradient-error: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 84% 70%));
     --gradient-card: linear-gradient(135deg, hsl(0 0% 100%), hsl(210 40% 98%));
+    --gradient-purple: linear-gradient(135deg, hsl(263 70% 50%), hsl(263 70% 65%));
+    --gradient-purple-dark: linear-gradient(135deg, hsl(263 70% 35%), hsl(263 70% 50%));
 
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
@@ -180,6 +189,39 @@ All colors MUST be HSL.
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+  }
+
+  .purple-gradient-bg {
+    background: var(--gradient-purple);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .purple-gradient-bg::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 40% 60%, rgba(255, 255, 255, 0.05) 0%, transparent 50%);
+    pointer-events: none;
+  }
+
+  .feature-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: all 0.3s ease;
+  }
+
+  .feature-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
   }
 
   .animate-float {
