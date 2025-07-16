@@ -21,7 +21,7 @@ interface Template {
 }
 
 const SendMessage = () => {
-  const { client } = useClientAuth();
+  const { client, session } = useClientAuth();
   const { templates, contacts, loading: dataLoading } = useClientData();
   
   const [recipients, setRecipients] = useState<string[]>([]);
@@ -77,6 +77,9 @@ const SendMessage = () => {
             recipient_phone: recipient,
             message_content: message,
             message_type: messageType
+          },
+          headers: {
+            'Authorization': `Bearer ${session?.token || ''}`
           }
         });
         

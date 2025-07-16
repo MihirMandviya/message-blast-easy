@@ -22,13 +22,7 @@ serve(async (req) => {
     // Get Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''  // Use service role key for client auth
     );
 
     // Get the authorization header
@@ -40,17 +34,28 @@ serve(async (req) => {
       });
     }
 
-    // Set the auth token
-    supabaseClient.auth.setSession({
-      access_token: authHeader.replace('Bearer ', ''),
-      refresh_token: '',
-    });
+    // Extract client session token
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Validate client session
+    const { data: sessionData, error: sessionError } = await supabaseClient
+      .from('client_sessions')
+      .select('client_id, client_users!inner(*)')
+      .eq('token', token)
+      .gt('expires_at', new Date().toISOString())
+      .single();
 
-    // Get the current user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
-      console.error('User authentication error:', userError);
-      return new Response('Unauthorized', { 
+    if (sessionError || !sessionData) {
+      console.error('Session validation error:', sessionError);
+      return new Response('Invalid or expired session', { 
+        status: 401, 
+        headers: corsHeaders 
+      });
+    }
+
+    const client = sessionData.client_users;
+    if (!client.is_active) {
+      return new Response('Client account is not active', { 
         status: 401, 
         headers: corsHeaders 
       });
@@ -63,7 +68,7 @@ serve(async (req) => {
     const { data: messageRecord, error: messageError } = await supabaseClient
       .from('messages')
       .insert({
-        user_id: user.id,
+        user_id: client.id,
         recipient_phone,
         message_content,
         message_type,
@@ -80,22 +85,8 @@ serve(async (req) => {
       });
     }
 
-    // Get user's WhatsApp API key from their profile
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('whatsapp_api_key, whatsapp_number')
-      .eq('user_id', user.id)
-      .single();
-
-    if (profileError || !profile) {
-      console.error('Profile fetch error:', profileError);
-      return new Response('User profile not found', { 
-        status: 404, 
-        headers: corsHeaders 
-      });
-    }
-
-    if (!profile.whatsapp_api_key) {
+    // Get client's WhatsApp API key and number
+    if (!client.whatsapp_api_key) {
       return new Response(JSON.stringify({
         success: false,
         error: 'WhatsApp API key not configured. Please add your API key in Settings.'
@@ -105,7 +96,7 @@ serve(async (req) => {
       });
     }
 
-    if (!profile.whatsapp_number) {
+    if (!client.whatsapp_number) {
       return new Response(JSON.stringify({
         success: false,
         error: 'WhatsApp number not configured. Please add your WhatsApp number in Settings.'
@@ -117,9 +108,9 @@ serve(async (req) => {
 
     // Create FormData for the WhatsApp API
     const formData = new FormData();
-    formData.append('userid', profile.whatsapp_api_key); // Using API key as userid
+    formData.append('userid', client.whatsapp_api_key); // Using API key as userid
     formData.append('msg', message_content);
-    formData.append('wabaNumber', profile.whatsapp_number);
+    formData.append('wabaNumber', client.whatsapp_number);
     formData.append('mobile', recipient_phone);
     formData.append('msgType', message_type);
     formData.append('sendMethod', 'quick');
@@ -129,7 +120,7 @@ serve(async (req) => {
     const whatsappResponse = await fetch('https://theultimate.io/WAApi/send', {
       method: 'POST',
       headers: {
-        'apikey': profile.whatsapp_api_key,
+        'apikey': client.whatsapp_api_key,
       },
       body: formData
     });

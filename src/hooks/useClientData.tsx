@@ -103,7 +103,10 @@ export const useClientData = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Contact creation error:', error);
+        throw error;
+      }
 
       setData(prev => ({
         ...prev,
@@ -112,6 +115,7 @@ export const useClientData = () => {
 
       return { data: newContact, error: null };
     } catch (error) {
+      console.error('Add contact error:', error);
       return { error: error instanceof Error ? error.message : 'Failed to add contact' };
     }
   }, [client]);
@@ -176,7 +180,10 @@ export const useClientData = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Template creation error:', error);
+        throw error;
+      }
 
       const processedTemplate = {
         ...newTemplate,
@@ -192,6 +199,7 @@ export const useClientData = () => {
 
       return { data: processedTemplate, error: null };
     } catch (error) {
+      console.error('Add template error:', error);
       return { error: error instanceof Error ? error.message : 'Failed to add template' };
     }
   }, [client]);

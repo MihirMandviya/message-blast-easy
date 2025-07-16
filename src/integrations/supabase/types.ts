@@ -870,6 +870,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active_client_user: {
+        Args: { user_id_param: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
