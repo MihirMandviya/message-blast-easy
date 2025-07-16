@@ -10,6 +10,7 @@ import { Send, Plus, Users, MessageSquare, FileText, BookOpen } from 'lucide-rea
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useClientAuth } from '@/hooks/useClientAuth';
+import { useClientData } from '@/hooks/useClientData';
 
 interface Template {
   id: string;
@@ -20,58 +21,16 @@ interface Template {
 }
 
 const SendMessage = () => {
+  const { client } = useClientAuth();
+  const { templates, contacts, loading: dataLoading } = useClientData();
+  
   const [recipients, setRecipients] = useState<string[]>([]);
   const [currentRecipient, setCurrentRecipient] = useState('');
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('text');
   const [isLoading, setIsLoading] = useState(false);
-  const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState('');
-  const [contacts, setContacts] = useState<any[]>([]);
   const { toast } = useToast();
-  const { client } = useClientAuth();
-
-  useEffect(() => {
-    if (client) {
-      fetchTemplates();
-      fetchContacts();
-    }
-  }, [client]);
-
-  const fetchTemplates = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('user_id', client.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTemplates((data || []).map(template => ({
-        ...template,
-        variables: Array.isArray(template.variables) 
-          ? template.variables.filter((v): v is string => typeof v === 'string')
-          : []
-      })));
-    } catch (error) {
-      console.error('Error fetching templates:', error);
-    }
-  };
-
-  const fetchContacts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('user_id', client.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setContacts(data || []);
-    } catch (error) {
-      console.error('Error fetching contacts:', error);
-    }
-  };
 
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);

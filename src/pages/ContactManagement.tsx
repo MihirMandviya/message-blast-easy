@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Users, Plus, Edit, Trash2, Search, Mail, Phone, UserPlus, Import, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useClientData } from '@/hooks/useClientData';
+import { useClientAuth } from '@/hooks/useClientAuth';
 
 interface Contact {
   id: string;
@@ -23,8 +23,17 @@ interface Contact {
 }
 
 const ContactManagement = () => {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { client } = useClientAuth();
+  const { 
+    contacts, 
+    loading, 
+    error, 
+    addContact, 
+    updateContact, 
+    deleteContact, 
+    refreshData 
+  } = useClientData();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
@@ -35,124 +44,89 @@ const ContactManagement = () => {
     tags: '',
     notes: ''
   });
-  const { user } = useAuth();
   const { toast } = useToast();
 
+  // Show error if exists
   useEffect(() => {
-    fetchContacts();
-  }, []);
-
-  const fetchContacts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('contacts')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setContacts(data || []);
-    } catch (error) {
-      console.error('Error fetching contacts:', error);
+    if (error) {
       toast({
         title: "Error",
-        description: "Failed to load contacts",
+        description: error,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [error, toast]);
 
   const handleCreateContact = async () => {
-    if (!user) return;
+    if (!client) return;
 
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .insert([{
-          name: newContact.name,
-          phone: newContact.phone,
-          email: newContact.email || null,
-          tags: newContact.tags ? newContact.tags.split(',').map(tag => tag.trim()) : [],
-          notes: newContact.notes || null,
-          user_id: user.id
-        }]);
+    const contactData = {
+      name: newContact.name,
+      phone: newContact.phone,
+      email: newContact.email || null,
+      tags: newContact.tags ? newContact.tags.split(',').map(tag => tag.trim()) : [],
+      notes: newContact.notes || null
+    };
 
-      if (error) throw error;
+    const { error } = await addContact(contactData);
 
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Success",
         description: "Contact created successfully",
       });
-
       setNewContact({ name: '', phone: '', email: '', tags: '', notes: '' });
       setIsCreateDialogOpen(false);
-      fetchContacts();
-    } catch (error) {
-      console.error('Error creating contact:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create contact",
-        variant: "destructive",
-      });
     }
   };
 
   const handleUpdateContact = async () => {
-    if (!editingContact || !user) return;
+    if (!editingContact || !client) return;
 
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .update({
-          name: editingContact.name,
-          phone: editingContact.phone,
-          email: editingContact.email || null,
-          tags: editingContact.tags,
-          notes: editingContact.notes || null
-        })
-        .eq('id', editingContact.id);
+    const updates = {
+      name: editingContact.name,
+      phone: editingContact.phone,
+      email: editingContact.email || null,
+      tags: editingContact.tags,
+      notes: editingContact.notes || null
+    };
 
-      if (error) throw error;
+    const { error } = await updateContact(editingContact.id, updates);
 
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Success",
         description: "Contact updated successfully",
       });
-
       setEditingContact(null);
-      fetchContacts();
-    } catch (error) {
-      console.error('Error updating contact:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update contact",
-        variant: "destructive",
-      });
     }
   };
 
   const handleDeleteContact = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .delete()
-        .eq('id', id);
+    const { error } = await deleteContact(id);
 
-      if (error) throw error;
-
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Success",
         description: "Contact deleted successfully",
-      });
-
-      fetchContacts();
-    } catch (error) {
-      console.error('Error deleting contact:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete contact",
-        variant: "destructive",
       });
     }
   };

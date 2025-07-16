@@ -1,19 +1,22 @@
-import { MessageSquare, Users, BarChart3, Send, Settings, Clock, FileText, HelpCircle } from 'lucide-react';
+import { MessageSquare, Users, BarChart3, Send, Settings, Clock, FileText, HelpCircle, TrendingUp, CheckCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useClientAuth } from '@/hooks/useClientAuth';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useClientData } from '@/hooks/useClientData';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
   const { client } = useClientAuth();
   const { admin } = useAdminAuth();
+  const { getStats, loading: dataLoading } = useClientData();
 
   const currentUser = admin || client;
   const userName = admin ? admin.full_name : client?.business_name;
+  const stats = getStats();
 
   const quickActions = [
     {
@@ -196,13 +199,15 @@ const Dashboard = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Messages</p>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-2xl font-bold">
+                  {dataLoading ? '...' : stats.totalMessages}
+                </p>
               </div>
               <Send className="h-8 w-8 text-blue-500" />
             </div>
@@ -214,7 +219,9 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Contacts</p>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-2xl font-bold">
+                  {dataLoading ? '...' : stats.totalContacts}
+                </p>
               </div>
               <Users className="h-8 w-8 text-green-500" />
             </div>
@@ -226,9 +233,25 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Templates</p>
-                <p className="text-2xl font-bold">0</p>
+                <p className="text-2xl font-bold">
+                  {dataLoading ? '...' : stats.totalTemplates}
+                </p>
               </div>
               <FileText className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Delivered</p>
+                <p className="text-2xl font-bold">
+                  {dataLoading ? '...' : stats.messagesDelivered}
+                </p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-emerald-500" />
             </div>
           </CardContent>
         </Card>

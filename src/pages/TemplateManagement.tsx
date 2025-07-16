@@ -11,6 +11,7 @@ import { Layout, Plus, Edit, Trash2, Copy, Search, Filter, MessageSquare, Zap } 
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useClientAuth } from '@/hooks/useClientAuth';
+import { useClientData } from '@/hooks/useClientData';
 
 interface Template {
   id: string;
@@ -23,8 +24,16 @@ interface Template {
 }
 
 const TemplateManagement = () => {
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { client } = useClientAuth();
+  const { 
+    templates, 
+    loading, 
+    error, 
+    addTemplate, 
+    updateTemplate, 
+    deleteTemplate 
+  } = useClientData();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -35,129 +44,85 @@ const TemplateManagement = () => {
     category: 'general',
     variables: []
   });
-  const { client } = useClientAuth();
   const { toast } = useToast();
 
+  // Show error if exists
   useEffect(() => {
-    if (client) {
-      fetchTemplates();
-    }
-  }, [client]);
-
-  const fetchTemplates = async () => {
-    if (!client) return;
-    try {
-      const { data, error } = await supabase
-        .from('templates')
-        .select('*')
-        .eq('user_id', client.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setTemplates((data || []).map(template => ({
-        ...template,
-        variables: Array.isArray(template.variables) 
-          ? template.variables.filter((v): v is string => typeof v === 'string')
-          : []
-      })));
-    } catch (error) {
-      console.error('Error fetching templates:', error);
+    if (error) {
       toast({
         title: "Error",
-        description: "Failed to load templates",
+        description: error,
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [error, toast]);
 
   const handleCreateTemplate = async () => {
     if (!client) return;
 
-    try {
-      const { error } = await supabase
-        .from('templates')
-        .insert([{
-          ...newTemplate,
-          user_id: client.id,
-          variables: extractVariables(newTemplate.content)
-        }]);
+    const templateData = {
+      ...newTemplate,
+      variables: extractVariables(newTemplate.content)
+    };
 
-      if (error) throw error;
+    const { error } = await addTemplate(templateData);
 
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Success",
         description: "Template created successfully",
       });
-
       setNewTemplate({ name: '', content: '', category: 'general', variables: [] });
       setIsCreateDialogOpen(false);
-      fetchTemplates();
-    } catch (error) {
-      console.error('Error creating template:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create template",
-        variant: "destructive",
-      });
     }
   };
 
   const handleUpdateTemplate = async () => {
     if (!editingTemplate || !client) return;
 
-    try {
-      const { error } = await supabase
-        .from('templates')
-        .update({
-          name: editingTemplate.name,
-          content: editingTemplate.content,
-          category: editingTemplate.category,
-          variables: extractVariables(editingTemplate.content)
-        })
-        .eq('id', editingTemplate.id);
+    const updates = {
+      name: editingTemplate.name,
+      content: editingTemplate.content,
+      category: editingTemplate.category,
+      variables: extractVariables(editingTemplate.content)
+    };
 
-      if (error) throw error;
+    const { error } = await updateTemplate(editingTemplate.id, updates);
 
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Success",
         description: "Template updated successfully",
       });
-
       setEditingTemplate(null);
-      fetchTemplates();
-    } catch (error) {
-      console.error('Error updating template:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update template",
-        variant: "destructive",
-      });
     }
   };
 
   const handleDeleteTemplate = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('templates')
-        .delete()
-        .eq('id', id);
+    const { error } = await deleteTemplate(id);
 
-      if (error) throw error;
-
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive",
+      });
+    } else {
       toast({
         title: "Success",
         description: "Template deleted successfully",
-      });
-
-      fetchTemplates();
-    } catch (error) {
-      console.error('Error deleting template:', error);
-      toast({
-        title: "Error",
-        description: "Failed to delete template",
-        variant: "destructive",
       });
     }
   };
@@ -183,7 +148,7 @@ const TemplateManagement = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const categories = ['all', ...new Set(templates.map(t => t.category))];
+  const categories = ['all', ...new Set(templates.map(t => t.category))].filter(Boolean);
 
   if (loading) {
     return (
@@ -228,7 +193,7 @@ const TemplateManagement = () => {
             <SelectContent>
               {categories.map(category => (
                 <SelectItem key={category} value={category}>
-                  {category === 'all' ? 'All Categories' : category.charAt(0).toUpperCase() + category.slice(1)}
+                  {category === 'all' ? 'All Categories' : String(category).charAt(0).toUpperCase() + String(category).slice(1)}
                 </SelectItem>
               ))}
             </SelectContent>
