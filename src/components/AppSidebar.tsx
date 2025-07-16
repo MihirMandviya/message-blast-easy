@@ -1,4 +1,4 @@
-import { MessageSquare, Send, Users, FileText, Settings, BarChart3, UserPlus } from "lucide-react";
+import { MessageSquare, Send, Users, FileText, Settings, BarChart3, UserPlus, History } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import {
@@ -15,9 +15,8 @@ import {
 const items = [
   { title: "Dashboard", url: "/", icon: BarChart3 },
   { title: "Send Message", url: "/send", icon: Send },
+  { title: "Message History", url: "/messages", icon: History },
   { title: "User Management", url: "/users", icon: UserPlus },
-  { title: "Templates", url: "/templates", icon: FileText },
-  { title: "Campaigns", url: "/campaigns", icon: Users },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 

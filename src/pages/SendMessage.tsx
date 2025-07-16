@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Send, Phone, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 const SendMessage = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -14,6 +16,7 @@ const SendMessage = () => {
   const [messageType, setMessageType] = useState('text');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { session } = useAuth();
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,18 +30,50 @@ const SendMessage = () => {
       return;
     }
 
+    if (!session) {
+      toast({
+        title: "Error",
+        description: "Please sign in to send messages",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     
-    // TODO: Implement WhatsApp API integration
-    setTimeout(() => {
-      toast({
-        title: "Message Sent!",
-        description: `Message sent to ${phoneNumber}`,
+    try {
+      const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
+        body: {
+          recipient_phone: phoneNumber,
+          message_content: message,
+          message_type: messageType
+        }
       });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data.success) {
+        toast({
+          title: "Message Sent!",
+          description: `Message sent to ${phoneNumber}`,
+        });
+        setPhoneNumber('');
+        setMessage('');
+      } else {
+        throw new Error(data.error || 'Failed to send message');
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send message",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-      setPhoneNumber('');
-      setMessage('');
-    }, 1000);
+    }
   };
 
   return (

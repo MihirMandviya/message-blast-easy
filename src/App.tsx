@@ -11,6 +11,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import SendMessage from "./pages/SendMessage";
+import MessageHistory from "./pages/MessageHistory";
 import SettingsPage from "./pages/SettingsPage";
 import UserManagement from "./pages/UserManagement";
 import NotFound from "./pages/NotFound";
@@ -37,6 +38,13 @@ const App = () => (
               <ProtectedRoute>
                 <DashboardLayout>
                   <SendMessage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            } />
+            <Route path="/messages" element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <MessageHistory />
                 </DashboardLayout>
               </ProtectedRoute>
             } />
