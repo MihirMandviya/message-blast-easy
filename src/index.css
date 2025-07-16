@@ -17,7 +17,7 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 263 70% 50%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -26,33 +26,64 @@ All colors MUST be HSL.
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 263 70% 50%;
+    --accent-foreground: 210 40% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 263 70% 50%;
 
     --radius: 0.5rem;
 
+    /* Success colors */
+    --success: 142 71% 45%;
+    --success-foreground: 210 40% 98%;
+    --success-light: 142 71% 92%;
+    --success-dark: 142 71% 35%;
+
+    /* Error colors */
+    --error: 0 84% 60%;
+    --error-foreground: 210 40% 98%;
+    --error-light: 0 84% 95%;
+    --error-dark: 0 84% 45%;
+
+    /* Warning colors */
+    --warning: 43 96% 56%;
+    --warning-foreground: 222.2 84% 4.9%;
+    --warning-light: 43 96% 95%;
+    --warning-dark: 43 96% 40%;
+
+    /* Info colors */
+    --info: 217 91% 60%;
+    --info-foreground: 210 40% 98%;
+    --info-light: 217 91% 95%;
+    --info-dark: 217 91% 45%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(263 70% 50%), hsl(263 70% 60%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 71% 55%));
+    --gradient-error: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 84% 70%));
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%), hsl(210 40% 98%));
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
+    --shadow-success: 0 4px 14px 0 hsl(142 71% 45% / 0.25);
+    --shadow-error: 0 4px 14px 0 hsl(0 84% 60% / 0.25);
+
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
+    --sidebar-primary: 263 70% 50%;
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 263 70% 50%;
   }
 
   .dark {
@@ -101,5 +132,68 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .card-success {
+    @apply bg-gradient-to-br from-success-light to-white border-success/20;
+    box-shadow: var(--shadow-success);
+  }
+
+  .card-error {
+    @apply bg-gradient-to-br from-error-light to-white border-error/20;
+    box-shadow: var(--shadow-error);
+  }
+
+  .card-enhanced {
+    @apply bg-gradient-to-br from-white to-gray-50/50 border-gray-200/50;
+    box-shadow: var(--shadow-lg);
+    transition: all 0.3s ease;
+  }
+
+  .card-enhanced:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .status-success {
+    @apply bg-success text-success-foreground;
+    box-shadow: var(--shadow-success);
+  }
+
+  .status-error {
+    @apply bg-error text-error-foreground;
+    box-shadow: var(--shadow-error);
+  }
+
+  .status-warning {
+    @apply bg-warning text-warning-foreground;
+  }
+
+  .status-info {
+    @apply bg-info text-info-foreground;
+  }
+
+  .gradient-text {
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
 }

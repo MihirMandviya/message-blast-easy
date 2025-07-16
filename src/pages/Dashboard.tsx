@@ -229,20 +229,53 @@ const Dashboard = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'sent':
-        return <CheckCircle className="h-3 w-3 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-success" />;
       case 'failed':
-        return <XCircle className="h-3 w-3 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-error" />;
       case 'pending':
-        return <Clock className="h-3 w-3 text-yellow-500" />;
+        return <Clock className="h-4 w-4 text-warning" />;
       default:
-        return <Clock className="h-3 w-3 text-gray-500" />;
+        return <Clock className="h-4 w-4 text-muted-foreground" />;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'sent':
+        return (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-success/10 text-success border border-success/20">
+            <CheckCircle className="h-3 w-3" />
+            <span className="text-xs font-medium">Sent</span>
+          </div>
+        );
+      case 'failed':
+        return (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-error/10 text-error border border-error/20">
+            <XCircle className="h-3 w-3" />
+            <span className="text-xs font-medium">Failed</span>
+          </div>
+        );
+      case 'pending':
+        return (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-warning/10 text-warning border border-warning/20">
+            <Clock className="h-3 w-3" />
+            <span className="text-xs font-medium">Pending</span>
+          </div>
+        );
+      default:
+        return (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/10 text-muted-foreground border border-muted/20">
+            <Clock className="h-3 w-3" />
+            <span className="text-xs font-medium">Unknown</span>
+          </div>
+        );
     }
   };
 
   const chartData: ChartData[] = [
-    { name: 'Sent', value: stats.sent, color: '#10B981' },
-    { name: 'Pending', value: stats.pending, color: '#F59E0B' },
-    { name: 'Failed', value: stats.failed, color: '#EF4444' },
+    { name: 'Sent', value: stats.sent, color: 'hsl(var(--success))' },
+    { name: 'Pending', value: stats.pending, color: 'hsl(var(--warning))' },
+    { name: 'Failed', value: stats.failed, color: 'hsl(var(--error))' },
   ];
 
   if (loading) {
@@ -256,12 +289,12 @@ const Dashboard = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+          <h2 className="text-3xl font-bold tracking-tight gradient-text">Dashboard</h2>
           <p className="text-muted-foreground">
             Overview of your WhatsApp messaging activity
           </p>
         </div>
-        <Button onClick={() => navigate('/send')} className="gap-2">
+        <Button onClick={() => navigate('/send')} className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg">
           <Plus className="h-4 w-4" />
           Send Message
         </Button>
@@ -269,52 +302,60 @@ const Dashboard = () => {
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="card-enhanced hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Messages Sent</CardTitle>
-            <Send className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-success/10 rounded-full">
+              <Send className="h-4 w-4 text-success" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.sent}</div>
+            <div className="text-2xl font-bold text-success">{stats.sent}</div>
             <p className="text-xs text-muted-foreground">
               {stats.total > 0 ? `${Math.round((stats.sent/stats.total)*100)}% of total` : 'No messages yet'}
             </p>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="card-enhanced hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Pending Messages</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-warning/10 rounded-full">
+              <Clock className="h-4 w-4 text-warning" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pending}</div>
+            <div className="text-2xl font-bold text-warning">{stats.pending}</div>
             <p className="text-xs text-muted-foreground">
               {stats.pending > 0 ? 'Awaiting delivery' : 'All messages processed'}
             </p>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="card-enhanced hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Messages</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-primary/10 rounded-full">
+              <MessageSquare className="h-4 w-4 text-primary" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
+            <div className="text-2xl font-bold text-primary">{stats.total}</div>
             <p className="text-xs text-muted-foreground">
               {stats.failed > 0 ? `${stats.failed} failed` : 'All successful'}
             </p>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="card-enhanced hover:shadow-xl transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Delivery Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-info/10 rounded-full">
+              <TrendingUp className="h-4 w-4 text-info" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.deliveryRate}%</div>
+            <div className="text-2xl font-bold text-info">{stats.deliveryRate}%</div>
             <p className="text-xs text-muted-foreground">
               {stats.total > 0 ? 'Success rate' : 'No data available'}
             </p>
@@ -325,9 +366,14 @@ const Dashboard = () => {
       {/* Charts Row */}
       <div className="grid gap-6 md:grid-cols-2">
         {/* Message Status Chart */}
-        <Card>
+        <Card className="card-enhanced">
           <CardHeader>
-            <CardTitle>Message Status Distribution</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 bg-primary/10 rounded-full">
+                <BarChart3 className="h-4 w-4 text-primary" />
+              </div>
+              Message Status Distribution
+            </CardTitle>
             <CardDescription>Breakdown of message statuses</CardDescription>
           </CardHeader>
           <CardContent>
@@ -363,9 +409,14 @@ const Dashboard = () => {
         </Card>
 
         {/* Weekly Activity Chart */}
-        <Card>
+        <Card className="card-enhanced">
           <CardHeader>
-            <CardTitle>Weekly Activity</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 bg-info/10 rounded-full">
+                <TrendingUp className="h-4 w-4 text-info" />
+              </div>
+              Weekly Activity
+            </CardTitle>
             <CardDescription>Messages sent over the past 7 days</CardDescription>
           </CardHeader>
           <CardContent>
@@ -376,8 +427,8 @@ const Dashboard = () => {
                   <XAxis dataKey="date" />
                   <YAxis />
                   <Tooltip />
-                  <Line type="monotone" dataKey="messages" stroke="#8884d8" strokeWidth={2} />
-                  <Line type="monotone" dataKey="success" stroke="#10B981" strokeWidth={2} />
+                  <Line type="monotone" dataKey="messages" stroke="hsl(var(--primary))" strokeWidth={3} />
+                  <Line type="monotone" dataKey="success" stroke="hsl(var(--success))" strokeWidth={3} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -395,10 +446,12 @@ const Dashboard = () => {
       {/* Quick Send and Recent Activity */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* Quick Send */}
-        <Card>
+        <Card className="card-enhanced">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="h-5 w-5" />
+              <div className="p-2 bg-primary/10 rounded-full animate-pulse">
+                <Zap className="h-4 w-4 text-primary" />
+              </div>
               Quick Send
             </CardTitle>
             <CardDescription>Send a message quickly</CardDescription>
@@ -434,17 +487,17 @@ const Dashboard = () => {
             <Button 
               onClick={handleQuickSend} 
               disabled={quickSendLoading}
-              className="w-full"
+              className="w-full bg-gradient-to-r from-success to-success/80 hover:from-success/90 hover:to-success/70 shadow-lg"
             >
               {quickSendLoading ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2" />
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
                   Sending...
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  Send
+                  Send Message
                 </>
               )}
             </Button>
@@ -452,10 +505,12 @@ const Dashboard = () => {
         </Card>
 
         {/* Recent Messages */}
-        <Card>
+        <Card className="card-enhanced">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
+              <div className="p-2 bg-info/10 rounded-full">
+                <MessageSquare className="h-4 w-4 text-info" />
+              </div>
               Recent Messages
             </CardTitle>
             <CardDescription>Your latest messages</CardDescription>
@@ -464,11 +519,11 @@ const Dashboard = () => {
             {recentMessages.length > 0 ? (
               <div className="space-y-3">
                 {recentMessages.map((message) => (
-                  <div key={message.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div key={message.id} className="flex items-center justify-between p-3 bg-gradient-to-r from-muted/30 to-muted/10 rounded-lg border border-muted/20 hover:shadow-md transition-all duration-200">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium text-sm">{message.recipient_phone}</span>
-                        {getStatusIcon(message.status)}
+                        {getStatusBadge(message.status)}
                       </div>
                       <p className="text-xs text-muted-foreground line-clamp-1">
                         {message.message_content}
@@ -483,9 +538,9 @@ const Dashboard = () => {
                   variant="outline" 
                   size="sm" 
                   onClick={() => navigate('/messages')}
-                  className="w-full"
+                  className="w-full border-primary/20 hover:bg-primary/5"
                 >
-                  View All
+                  View All Messages
                 </Button>
               </div>
             ) : (
@@ -498,10 +553,12 @@ const Dashboard = () => {
         </Card>
 
         {/* Recent Contacts */}
-        <Card>
+        <Card className="card-enhanced">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
+              <div className="p-2 bg-success/10 rounded-full">
+                <Users className="h-4 w-4 text-success" />
+              </div>
               Recent Contacts
             </CardTitle>
             <CardDescription>Frequently messaged contacts</CardDescription>
@@ -510,9 +567,9 @@ const Dashboard = () => {
             {recentContacts.length > 0 ? (
               <div className="space-y-3">
                 {recentContacts.map((contact, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                  <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-muted/30 to-muted/10 rounded-lg border border-muted/20 hover:shadow-md transition-all duration-200">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-primary/20 to-primary/10 rounded-full flex items-center justify-center border border-primary/20">
                         <Phone className="h-4 w-4 text-primary" />
                       </div>
                       <span className="font-medium text-sm">{contact.phone}</span>
@@ -523,6 +580,7 @@ const Dashboard = () => {
                       onClick={() => {
                         setQuickPhone(contact.phone);
                       }}
+                      className="hover:bg-primary/10 hover:text-primary"
                     >
                       Message
                     </Button>
@@ -531,7 +589,9 @@ const Dashboard = () => {
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
-                <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <div className="w-12 h-12 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Users className="h-6 w-6 opacity-50" />
+                </div>
                 <p className="text-sm">No contacts yet</p>
               </div>
             )}
