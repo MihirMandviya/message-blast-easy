@@ -113,7 +113,12 @@ const SendMessage = () => {
         
         if (error) {
           console.error('Error sending to', recipient, ':', error);
-          throw error;
+          throw new Error(`Failed to send to ${recipient}: ${error.message}`);
+        }
+        
+        // Check if the response indicates failure
+        if (data && !data.success) {
+          throw new Error(data.error || `Failed to send to ${recipient}`);
         }
         
         return data;

@@ -27,37 +27,60 @@ serve(async (req) => {
 
     // Get the authorization header
     const authHeader = req.headers.get('Authorization');
+    console.log('Authorization header:', authHeader ? 'Present' : 'Missing');
+    
     if (!authHeader) {
-      return new Response('Missing authorization header', { 
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing authorization header'
+      }), { 
         status: 401, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     // Extract client session token
     const token = authHeader.replace('Bearer ', '');
+    console.log('Token length:', token.length);
+    console.log('Token preview:', token.substring(0, 10) + '...');
     
     // Validate client session
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('client_sessions')
-      .select('client_id, client_users!inner(*)')
+      .select(`
+        client_id,
+        client_users!inner(
+          id,
+          email,
+          business_name,
+          whatsapp_api_key,
+          whatsapp_number,
+          is_active
+        )
+      `)
       .eq('token', token)
       .gt('expires_at', new Date().toISOString())
       .single();
 
     if (sessionError || !sessionData) {
       console.error('Session validation error:', sessionError);
-      return new Response('Invalid or expired session', { 
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid or expired session'
+      }), { 
         status: 401, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     const client = sessionData.client_users;
     if (!client.is_active) {
-      return new Response('Client account is not active', { 
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Client account is not active'
+      }), { 
         status: 401, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
