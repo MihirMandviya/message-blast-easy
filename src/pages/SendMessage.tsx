@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,18 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Send, Plus, Users, MessageSquare } from 'lucide-react';
+import { Send, Plus, Users, MessageSquare, FileText, BookOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useClientAuth } from '@/hooks/useClientAuth';
+
+interface Template {
+  id: string;
+  name: string;
+  content: string;
+  category: string;
+  variables: string[];
+}
 
 const SendMessage = () => {
   const [recipients, setRecipients] = useState<string[]>([]);
@@ -17,8 +25,67 @@ const SendMessage = () => {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('text');
   const [isLoading, setIsLoading] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [contacts, setContacts] = useState<any[]>([]);
   const { toast } = useToast();
   const { client } = useClientAuth();
+
+  useEffect(() => {
+    if (client) {
+      fetchTemplates();
+      fetchContacts();
+    }
+  }, [client]);
+
+  const fetchTemplates = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('*')
+        .eq('user_id', client.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setTemplates((data || []).map(template => ({
+        ...template,
+        variables: Array.isArray(template.variables) 
+          ? template.variables.filter((v): v is string => typeof v === 'string')
+          : []
+      })));
+    } catch (error) {
+      console.error('Error fetching templates:', error);
+    }
+  };
+
+  const fetchContacts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('user_id', client.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setContacts(data || []);
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+    }
+  };
+
+  const handleTemplateSelect = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setMessage(template.content);
+      setSelectedTemplate(templateId);
+    }
+  };
+
+  const addFromContacts = (contactPhone: string) => {
+    if (contactPhone && !recipients.includes(contactPhone)) {
+      setRecipients([...recipients, contactPhone]);
+    }
+  };
 
   const addRecipient = () => {
     if (currentRecipient && !recipients.includes(currentRecipient)) {
@@ -44,26 +111,42 @@ const SendMessage = () => {
     setIsLoading(true);
     
     try {
-      // Create message records for each recipient
-      const messagePromises = recipients.map(recipient => 
-        supabase.from('messages').insert([{
-          user_id: client.id,
-          client_id: client.id,
-          recipient_phone: recipient,
-          message_content: message,
-          message_type: messageType,
-          status: 'pending'
-        }])
-      );
-
-      await Promise.all(messagePromises);
-
-      // Here you would typically call your WhatsApp API
-      // For now, we'll just update the status to sent
-      toast({
-        title: "Success",
-        description: `Message sent to ${recipients.length} recipient(s)`,
+      // Send messages through the WhatsApp API
+      const sendPromises = recipients.map(async (recipient) => {
+        const { data, error } = await supabase.functions.invoke('send-whatsapp-message', {
+          body: {
+            recipient_phone: recipient,
+            message_content: message,
+            message_type: messageType
+          }
+        });
+        
+        if (error) {
+          console.error('Error sending to', recipient, ':', error);
+          throw error;
+        }
+        
+        return data;
       });
+
+      const results = await Promise.all(sendPromises);
+      
+      // Check if all messages were sent successfully
+      const successCount = results.filter(result => result?.success).length;
+      const failedCount = recipients.length - successCount;
+      
+      if (successCount > 0) {
+        toast({
+          title: "Success",
+          description: `${successCount} message(s) sent successfully${failedCount > 0 ? `, ${failedCount} failed` : ''}`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "All messages failed to send. Please check your API configuration.",
+          variant: "destructive"
+        });
+      }
 
       // Reset form
       setRecipients([]);
@@ -73,7 +156,7 @@ const SendMessage = () => {
       console.error('Error sending message:', error);
       toast({
         title: "Error",
-        description: "Failed to send message",
+        description: "Failed to send message. Please check your WhatsApp API settings.",
         variant: "destructive"
       });
     } finally {
@@ -90,9 +173,9 @@ const SendMessage = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Message Composition */}
-        <Card>
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="h-5 w-5" />
@@ -103,25 +186,43 @@ const SendMessage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="message-type">Message Type</Label>
-              <Select value={messageType} onValueChange={setMessageType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="text">Text</SelectItem>
-                  <SelectItem value="image">Image</SelectItem>
-                  <SelectItem value="document">Document</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="message-type">Message Type</Label>
+                <Select value={messageType} onValueChange={setMessageType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="text">Text</SelectItem>
+                    <SelectItem value="image">Image</SelectItem>
+                    <SelectItem value="document">Document</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="template-select">Use Template</Label>
+                <Select value={selectedTemplate} onValueChange={handleTemplateSelect}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map(template => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="message">Message Content</Label>
               <Textarea
                 id="message"
-                placeholder="Type your message here..."
+                placeholder="Type your message here or select a template..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={6}
@@ -152,7 +253,7 @@ const SendMessage = () => {
           </CardContent>
         </Card>
 
-        {/* Recipients */}
+        {/* Recipients & Contacts */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -160,7 +261,7 @@ const SendMessage = () => {
               Recipients
             </CardTitle>
             <CardDescription>
-              Add phone numbers to send messages to
+              Add recipients manually or from contacts
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -177,8 +278,34 @@ const SendMessage = () => {
             </div>
 
             <div className="space-y-2">
+              <Label>From Contacts</Label>
+              <div className="max-h-[120px] overflow-y-auto border rounded-md p-2">
+                {contacts.length > 0 ? (
+                  <div className="space-y-1">
+                    {contacts.slice(0, 10).map(contact => (
+                      <div key={contact.id} className="flex items-center justify-between p-2 text-sm hover:bg-muted rounded">
+                        <span>{contact.name} ({contact.phone})</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => addFromContacts(contact.phone)}
+                        >
+                          Add
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground py-2">
+                    No contacts found
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label>Selected Recipients ({recipients.length})</Label>
-              <div className="border rounded-md p-3 min-h-[200px] max-h-[300px] overflow-y-auto">
+              <div className="border rounded-md p-3 min-h-[120px] max-h-[200px] overflow-y-auto">
                 {recipients.length > 0 ? (
                   <div className="space-y-2">
                     {recipients.map((phone, index) => (

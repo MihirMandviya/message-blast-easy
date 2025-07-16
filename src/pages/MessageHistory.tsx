@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageSquare, Phone, Search, Filter, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useClientAuth } from '@/hooks/useClientAuth';
 import { useToast } from '@/hooks/use-toast';
 
 interface Message {
@@ -25,14 +25,14 @@ const MessageHistory = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const { session } = useAuth();
+  const { client } = useClientAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    if (session) {
+    if (client) {
       fetchMessages();
     }
-  }, [session]);
+  }, [client]);
 
   const fetchMessages = async () => {
     try {
@@ -40,6 +40,7 @@ const MessageHistory = () => {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
+        .eq('user_id', client.id)
         .order('created_at', { ascending: false });
 
       if (error) {

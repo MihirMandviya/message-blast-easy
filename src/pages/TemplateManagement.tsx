@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Layout, Plus, Edit, Trash2, Copy, Search, Filter, MessageSquare, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useClientAuth } from '@/hooks/useClientAuth';
 
 interface Template {
   id: string;
@@ -35,18 +35,22 @@ const TemplateManagement = () => {
     category: 'general',
     variables: []
   });
-  const { user } = useAuth();
+  const { client } = useClientAuth();
   const { toast } = useToast();
 
   useEffect(() => {
-    fetchTemplates();
-  }, []);
+    if (client) {
+      fetchTemplates();
+    }
+  }, [client]);
 
   const fetchTemplates = async () => {
+    if (!client) return;
     try {
       const { data, error } = await supabase
         .from('templates')
         .select('*')
+        .eq('user_id', client.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -69,14 +73,14 @@ const TemplateManagement = () => {
   };
 
   const handleCreateTemplate = async () => {
-    if (!user) return;
+    if (!client) return;
 
     try {
       const { error } = await supabase
         .from('templates')
         .insert([{
           ...newTemplate,
-          user_id: user.id,
+          user_id: client.id,
           variables: extractVariables(newTemplate.content)
         }]);
 
@@ -101,7 +105,7 @@ const TemplateManagement = () => {
   };
 
   const handleUpdateTemplate = async () => {
-    if (!editingTemplate || !user) return;
+    if (!editingTemplate || !client) return;
 
     try {
       const { error } = await supabase
