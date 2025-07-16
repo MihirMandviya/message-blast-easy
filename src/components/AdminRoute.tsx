@@ -1,29 +1,25 @@
-import { useUserRole } from '@/hooks/useUserRole';
+import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Skeleton } from './ui/skeleton';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 
 interface AdminRouteProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
-export function AdminRoute({ children }: AdminRouteProps) {
-  const { role, loading } = useUserRole();
+export const AdminRoute = ({ children }: AdminRouteProps) => {
+  const { isAuthenticated, isLoading } = useAdminAuth();
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <div className="space-y-4">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-32 w-96" />
-          <Skeleton className="h-8 w-32" />
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (role !== 'admin') {
-    return <Navigate to="/" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/admin-auth" replace />;
   }
 
   return <>{children}</>;
-}
+};
