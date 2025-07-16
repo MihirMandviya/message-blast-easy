@@ -1,4 +1,4 @@
-import { MessageSquare, Send, Users, FileText, Settings, BarChart3, UserPlus, History, Shield, HelpCircle, Layout, Workflow, Clock, UsersIcon, Upload, Layers, Target } from "lucide-react";
+import { MessageSquare, Send, Users, FileText, Settings, BarChart3, UserPlus, History, Shield, HelpCircle, LayoutTemplate, Workflow, Clock, UsersIcon, Upload, Layers, Target } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 
@@ -17,7 +17,7 @@ const userItems = [
   { title: "Dashboard", url: "/", icon: BarChart3 },
   { title: "Send Message", url: "/send", icon: Send },
   { title: "Message History", url: "/messages", icon: History },
-  { title: "Templates", url: "/templates", icon: Layout },
+  { title: "Templates", url: "/templates", icon: LayoutTemplate },
   { title: "Contacts", url: "/contacts", icon: Users },
   { title: "Groups", url: "/groups", icon: Layers },
   { title: "Automation", url: "/flows", icon: Workflow },
