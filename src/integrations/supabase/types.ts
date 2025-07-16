@@ -14,8 +14,121 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_logs: {
+        Row: {
+          action: string
+          admin_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          ip_address: unknown | null
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          action: string
+          admin_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          action?: string
+          admin_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_logs_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_sessions: {
+        Row: {
+          admin_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          ip_address: unknown | null
+          token: string
+          user_agent: string | null
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip_address?: unknown | null
+          token: string
+          user_agent?: string | null
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          token?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_sessions_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_users: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          is_active: boolean
+          last_login: string | null
+          password_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          is_active?: boolean
+          last_login?: string | null
+          password_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          last_login?: string | null
+          password_hash?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
+          client_id: string | null
           created_at: string
           delivered_count: number | null
           description: string | null
@@ -32,6 +145,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           delivered_count?: number | null
           description?: string | null
@@ -48,6 +162,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           delivered_count?: number | null
           description?: string | null
@@ -63,7 +178,150 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_sessions: {
+        Row: {
+          client_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          ip_address: unknown | null
+          token: string
+          user_agent: string | null
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          ip_address?: unknown | null
+          token: string
+          user_agent?: string | null
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          token?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_sessions_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_settings: {
+        Row: {
+          client_id: string
+          created_at: string
+          features_enabled: Json | null
+          id: string
+          max_contacts: number | null
+          max_messages_per_day: number | null
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          features_enabled?: Json | null
+          id?: string
+          max_contacts?: number | null
+          max_messages_per_day?: number | null
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          features_enabled?: Json | null
+          id?: string
+          max_contacts?: number | null
+          max_messages_per_day?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_settings_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: true
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_users: {
+        Row: {
+          business_name: string
+          created_at: string
+          created_by: string
+          email: string
+          id: string
+          is_active: boolean
+          last_login: string | null
+          password_hash: string
+          phone_number: string
+          subscription_expires_at: string | null
+          subscription_plan: string
+          updated_at: string
+          whatsapp_api_key: string | null
+          whatsapp_number: string | null
+        }
+        Insert: {
+          business_name: string
+          created_at?: string
+          created_by: string
+          email: string
+          id?: string
+          is_active?: boolean
+          last_login?: string | null
+          password_hash: string
+          phone_number: string
+          subscription_expires_at?: string | null
+          subscription_plan?: string
+          updated_at?: string
+          whatsapp_api_key?: string | null
+          whatsapp_number?: string | null
+        }
+        Update: {
+          business_name?: string
+          created_at?: string
+          created_by?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          last_login?: string | null
+          password_hash?: string
+          phone_number?: string
+          subscription_expires_at?: string | null
+          subscription_plan?: string
+          updated_at?: string
+          whatsapp_api_key?: string | null
+          whatsapp_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "admin_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contact_groups: {
         Row: {
@@ -103,6 +361,7 @@ export type Database = {
       }
       contacts: {
         Row: {
+          client_id: string | null
           created_at: string
           custom_fields: Json | null
           email: string | null
@@ -115,6 +374,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           custom_fields?: Json | null
           email?: string | null
@@ -127,6 +387,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           custom_fields?: Json | null
           email?: string | null
@@ -138,7 +399,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       flow_steps: {
         Row: {
@@ -186,6 +455,7 @@ export type Database = {
       }
       flows: {
         Row: {
+          client_id: string | null
           created_at: string
           description: string | null
           id: string
@@ -197,6 +467,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -208,6 +479,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
@@ -218,10 +490,19 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "flows_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       groups: {
         Row: {
+          client_id: string | null
           created_at: string
           criteria: Json | null
           description: string | null
@@ -231,6 +512,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           criteria?: Json | null
           description?: string | null
@@ -240,6 +522,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           criteria?: Json | null
           description?: string | null
@@ -248,10 +531,19 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "groups_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
+          client_id: string | null
           created_at: string
           error_message: string | null
           id: string
@@ -264,6 +556,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
@@ -276,6 +569,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
@@ -287,11 +581,20 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
           business_name: string | null
+          client_id: string | null
           created_at: string
           email: string | null
           id: string
@@ -302,6 +605,7 @@ export type Database = {
         }
         Insert: {
           business_name?: string | null
+          client_id?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -312,6 +616,7 @@ export type Database = {
         }
         Update: {
           business_name?: string | null
+          client_id?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -320,10 +625,19 @@ export type Database = {
           whatsapp_api_key?: string | null
           whatsapp_number?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scheduled_messages: {
         Row: {
+          client_id: string | null
           created_at: string
           error_message: string | null
           flow_id: string | null
@@ -340,6 +654,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          client_id?: string | null
           created_at?: string
           error_message?: string | null
           flow_id?: string | null
@@ -356,6 +671,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          client_id?: string | null
           created_at?: string
           error_message?: string | null
           flow_id?: string | null
@@ -371,11 +687,20 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_messages_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       templates: {
         Row: {
           category: string
+          client_id: string | null
           content: string
           created_at: string
           id: string
@@ -386,6 +711,7 @@ export type Database = {
         }
         Insert: {
           category?: string
+          client_id?: string | null
           content: string
           created_at?: string
           id?: string
@@ -396,6 +722,7 @@ export type Database = {
         }
         Update: {
           category?: string
+          client_id?: string | null
           content?: string
           created_at?: string
           id?: string
@@ -404,7 +731,15 @@ export type Database = {
           user_id?: string
           variables?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "templates_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ticket_comments: {
         Row: {
@@ -445,6 +780,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           category: string
+          client_id: string | null
           created_at: string
           description: string
           id: string
@@ -457,6 +793,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           category?: string
+          client_id?: string | null
           created_at?: string
           description: string
           id?: string
@@ -469,6 +806,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           category?: string
+          client_id?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -478,34 +816,29 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tickets_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      authenticate_admin: {
+        Args: { email_input: string; password_input: string }
+        Returns: Json
+      }
+      authenticate_client: {
+        Args: { email_input: string; password_input: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _user_id: string
