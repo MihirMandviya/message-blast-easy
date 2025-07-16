@@ -96,6 +96,37 @@ export const useClientData = () => {
   const addContact = useCallback(async (contactData: any) => {
     if (!client) return { error: 'Not authenticated' };
 
+    // Validate required fields
+    if (!contactData.name?.trim()) {
+      return { error: 'Name is required' };
+    }
+    
+    if (!contactData.phone?.trim()) {
+      return { error: 'Phone number is required' };
+    }
+
+    // Validate phone number format
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(contactData.phone.replace(/\s+/g, ''))) {
+      return { error: 'Please enter a valid phone number (e.g., +1234567890)' };
+    }
+
+    // Check for duplicate phone number
+    const existingContact = data.contacts.find(
+      contact => contact.phone === contactData.phone
+    );
+    if (existingContact) {
+      return { error: 'A contact with this phone number already exists' };
+    }
+
+    // Validate email format if provided
+    if (contactData.email && contactData.email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(contactData.email)) {
+        return { error: 'Please enter a valid email address' };
+      }
+    }
+
     try {
       const { data: newContact, error } = await supabase
         .from('contacts')
@@ -118,7 +149,7 @@ export const useClientData = () => {
       console.error('Add contact error:', error);
       return { error: error instanceof Error ? error.message : 'Failed to add contact' };
     }
-  }, [client]);
+  }, [client, data.contacts]);
 
   const updateContact = useCallback(async (id: string, updates: any) => {
     if (!client) return { error: 'Not authenticated' };

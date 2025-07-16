@@ -60,12 +60,31 @@ const ContactManagement = () => {
   const handleCreateContact = async () => {
     if (!client) return;
 
+    // Basic validation
+    if (!newContact.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a contact name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newContact.phone.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const contactData = {
-      name: newContact.name,
-      phone: newContact.phone,
-      email: newContact.email || null,
-      tags: newContact.tags ? newContact.tags.split(',').map(tag => tag.trim()) : [],
-      notes: newContact.notes || null
+      name: newContact.name.trim(),
+      phone: newContact.phone.trim(),
+      email: newContact.email.trim() || null,
+      tags: newContact.tags ? newContact.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
+      notes: newContact.notes.trim() || null
     };
 
     const { error } = await addContact(contactData);

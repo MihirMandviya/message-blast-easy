@@ -47,10 +47,38 @@ const SendMessage = () => {
   };
 
   const addRecipient = () => {
-    if (currentRecipient && !recipients.includes(currentRecipient)) {
-      setRecipients([...recipients, currentRecipient]);
-      setCurrentRecipient('');
+    if (!currentRecipient.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a phone number",
+        variant: "destructive"
+      });
+      return;
     }
+
+    // Validate phone number format
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    if (!phoneRegex.test(currentRecipient.replace(/\s+/g, ''))) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid phone number (e.g., +1234567890)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check for duplicate
+    if (recipients.includes(currentRecipient)) {
+      toast({
+        title: "Error",
+        description: "This phone number is already in your recipient list",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setRecipients([...recipients, currentRecipient]);
+    setCurrentRecipient('');
   };
 
   const removeRecipient = (phone: string) => {
@@ -116,11 +144,27 @@ const SendMessage = () => {
       setMessageType('text');
     } catch (error) {
       console.error('Error sending message:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message. Please check your WhatsApp API settings.",
-        variant: "destructive"
-      });
+      
+      // Check if it's a configuration error
+      if (error instanceof Error && error.message.includes('WhatsApp API key')) {
+        toast({
+          title: "Configuration Error",
+          description: "WhatsApp API key is not configured. Please add your API key in Settings.",
+          variant: "destructive"
+        });
+      } else if (error instanceof Error && error.message.includes('WhatsApp number')) {
+        toast({
+          title: "Configuration Error", 
+          description: "WhatsApp number is not configured. Please add your WhatsApp number in Settings.",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to send message. Please check your WhatsApp API settings and try again.",
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsLoading(false);
     }
