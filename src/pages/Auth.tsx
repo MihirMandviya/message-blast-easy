@@ -48,15 +48,22 @@ const Auth = () => {
         {/* Right side - Auth Form */}
         <Card className="w-full max-w-md mx-auto">
           <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <MessageSquare className="h-12 w-12 text-primary" />
+            <div className="flex items-center justify-center mb-4">
+              <div className="p-3 bg-green-100 rounded-full">
+                <MessageSquare className="h-6 w-6 text-green-600" />
+              </div>
             </div>
-            <CardTitle className="text-2xl font-bold">WhatsApp Business Hub</CardTitle>
+            <CardTitle className="text-2xl font-bold">Client Login</CardTitle>
             <CardDescription>
-              Sign in to your business messaging dashboard
+              Sign in to your WhatsApp Business Hub
             </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800 mb-2">Test Account:</p>
+              <p className="text-xs text-blue-600">Email: nandlal@example.com</p>
+              <p className="text-xs text-blue-600">Password: password123</p>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>

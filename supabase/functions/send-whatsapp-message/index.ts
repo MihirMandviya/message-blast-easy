@@ -44,11 +44,14 @@ serve(async (req) => {
     console.log('Token length:', token.length);
     console.log('Token preview:', token.substring(0, 10) + '...');
     
-    // Validate client session
+    // Validate client session with a simpler query first
+    console.log('Searching for token:', token);
+    
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('client_sessions')
       .select(`
         client_id,
+        expires_at,
         client_users!inner(
           id,
           email,
@@ -60,10 +63,23 @@ serve(async (req) => {
       `)
       .eq('token', token)
       .gt('expires_at', new Date().toISOString())
-      .single();
+      .maybeSingle();
 
-    if (sessionError || !sessionData) {
+    console.log('Session query result:', { sessionData, sessionError });
+
+    if (sessionError) {
       console.error('Session validation error:', sessionError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Session validation failed: ' + sessionError.message
+      }), { 
+        status: 401, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!sessionData) {
+      console.error('No session found for token');
       return new Response(JSON.stringify({
         success: false,
         error: 'Invalid or expired session'

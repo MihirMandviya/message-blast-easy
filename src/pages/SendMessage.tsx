@@ -86,7 +86,19 @@ const SendMessage = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!client || recipients.length === 0 || !message.trim()) {
+    console.log('Client state:', client);
+    console.log('Session state:', session);
+    
+    if (!client || !session) {
+      toast({
+        title: "Error",
+        description: "You are not logged in. Please log in and try again.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (recipients.length === 0 || !message.trim()) {
       toast({
         title: "Error",
         description: "Please add recipients and enter a message",
