@@ -59,12 +59,26 @@ serve(async (req) => {
     // Get the request body
     const { recipient_phone, message_content, message_type }: WhatsAppMessageRequest = await req.json();
 
-    console.log('Sending WhatsApp message:', {
-      recipient_phone,
-      message_content,
-      message_type,
-      user_id: user.id
-    });
+    // Create message record in database
+    const { data: messageRecord, error: messageError } = await supabaseClient
+      .from('messages')
+      .insert({
+        user_id: user.id,
+        recipient_phone,
+        message_content,
+        message_type,
+        status: 'pending'
+      })
+      .select()
+      .single();
+
+    if (messageError) {
+      console.error('Message creation error:', messageError);
+      return new Response('Failed to create message record', { 
+        status: 500, 
+        headers: corsHeaders 
+      });
+    }
 
     // Get user's WhatsApp API key from their profile
     const { data: profile, error: profileError } = await supabaseClient
@@ -88,35 +102,44 @@ serve(async (req) => {
       });
     }
 
-    // Create message record in database
-    const { data: messageRecord, error: messageError } = await supabaseClient
-      .from('messages')
-      .insert({
-        user_id: user.id,
-        recipient_phone,
-        message_content,
-        message_type,
-        status: 'pending'
-      })
-      .select()
-      .single();
+    // Create FormData for the WhatsApp API
+    const formData = new FormData();
+    formData.append('userid', profile.whatsapp_api_key); // Using API key as userid
+    formData.append('msg', message_content);
+    formData.append('wabaNumber', profile.whatsapp_number);
+    formData.append('mobile', recipient_phone);
+    formData.append('msgType', message_type);
+    formData.append('sendMethod', 'quick');
+    formData.append('output', 'json');
 
-    if (messageError) {
-      console.error('Message creation error:', messageError);
-      return new Response('Failed to create message record', { 
-        status: 500, 
-        headers: corsHeaders 
-      });
+    // Send message via theultimate.io API
+    const whatsappResponse = await fetch('https://theultimate.io/WAApi/send', {
+      method: 'POST',
+      headers: {
+        'apikey': profile.whatsapp_api_key,
+      },
+      body: formData
+    });
+
+    const whatsappResult = await whatsappResponse.json();
+    console.log('WhatsApp API response:', whatsappResult);
+
+    // Update message status based on response
+    const updateData: any = {
+      sent_at: new Date().toISOString()
+    };
+
+    if (whatsappResponse.ok && whatsappResult.status === 'success') {
+      updateData.status = 'sent';
+    } else {
+      updateData.status = 'failed';
+      updateData.error_message = whatsappResult.message || 'Failed to send message';
     }
 
-    // For now, we'll just mark the message as sent
-    // The actual WhatsApp API integration will be done later
+    // Update message record with result
     const { error: updateError } = await supabaseClient
       .from('messages')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', messageRecord.id);
 
     if (updateError) {
@@ -126,10 +149,11 @@ serve(async (req) => {
     console.log('Message processed successfully:', messageRecord.id);
 
     return new Response(JSON.stringify({
-      success: true,
-      message: 'Message sent successfully',
+      success: updateData.status === 'sent',
+      message: updateData.status === 'sent' ? 'Message sent successfully' : 'Message failed to send',
       message_id: messageRecord.id,
-      status: 'sent'
+      status: updateData.status,
+      whatsapp_response: whatsappResult
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
