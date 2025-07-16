@@ -96,9 +96,22 @@ serve(async (req) => {
     }
 
     if (!profile.whatsapp_api_key) {
-      return new Response('WhatsApp API key not configured', { 
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'WhatsApp API key not configured. Please add your API key in Settings.'
+      }), { 
         status: 400, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!profile.whatsapp_number) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'WhatsApp number not configured. Please add your WhatsApp number in Settings.'
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
