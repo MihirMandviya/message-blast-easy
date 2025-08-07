@@ -577,6 +577,66 @@ export type Database = {
           },
         ]
       }
+      media: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          creation_time: number
+          description: string | null
+          id: string
+          media_id: string
+          media_type: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string
+          waba_number: number | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          creation_time: number
+          description?: string | null
+          id?: string
+          media_id: string
+          media_type: string
+          name: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          waba_number?: number | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          creation_time?: number
+          description?: string | null
+          id?: string
+          media_id?: string
+          media_type?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          waba_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           campaign_id: string | null

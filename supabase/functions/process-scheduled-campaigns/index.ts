@@ -16,7 +16,7 @@ Deno.serve(async (req: Request) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
-    const { createClient } = await import('@supabase/supabase-js');
+    const { createClient } = await import('npm:@supabase/supabase-js@2');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get current UTC time for comparison
@@ -121,7 +121,7 @@ Deno.serve(async (req: Request) => {
                 message_content: messageContent,
                 message_type: campaign.message_type || 'text',
                 status: 'pending',
-                client_id: campaign.client_id,
+                client_id: campaign.user_id, // Use user_id as client_id since campaigns use user_id
                 campaign_id: campaign.id
               });
 

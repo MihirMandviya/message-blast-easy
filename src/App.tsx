@@ -24,6 +24,7 @@ import ContactManagement from "./pages/ContactManagement";
 import ListContacts from "./pages/ListContacts";
 import ScheduledMessages from "./pages/ScheduledMessages";
 import ClientManagement from "./pages/ClientManagement";
+import MediaManagement from "./pages/MediaManagement";
 import TimezoneTest from "./pages/TimezoneTest";
 import NotFound from "./pages/NotFound";
 
@@ -110,6 +111,13 @@ const App = () => (
                 <ProtectedRoute>
                   <DashboardLayout>
                     <SupportTickets />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/media" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <MediaManagement />
                   </DashboardLayout>
                 </ProtectedRoute>
               } />

@@ -12,6 +12,8 @@ interface WhatsAppMessageRequest {
   message_type: string;
   template_name?: string;
   campaign_id?: string;
+  media_id?: string;
+  media_type?: string;
 }
 
 serve(async (req) => {
@@ -102,7 +104,7 @@ serve(async (req) => {
     }
 
     // Get the request body
-    const { recipient_phone, message_content, message_type, template_name, campaign_id }: WhatsAppMessageRequest = await req.json();
+    const { recipient_phone, message_content, message_type, template_name, campaign_id, media_id, media_type }: WhatsAppMessageRequest = await req.json();
 
     // Validate required fields
     if (!recipient_phone || !message_content) {
@@ -120,6 +122,7 @@ serve(async (req) => {
       .from('messages')
       .insert({
         user_id: client.id,
+        client_id: client.id, // Add client_id for consistency
         recipient_phone,
         message_content,
         message_type: message_type || 'text',
@@ -161,7 +164,11 @@ serve(async (req) => {
       });
     }
 
-    // Create FormData for the theultimate.io WhatsApp API (matching exact format)
+    // Determine if this is a media message
+    const isMediaMessage = media_id && media_type;
+    const msgType = isMediaMessage ? 'media' : 'text';
+
+    // Create FormData for the theultimate.io WhatsApp API
     const formData = new FormData();
     formData.append('userid', client.user_id || client.id);
     formData.append('msg', message_content);
@@ -169,14 +176,20 @@ serve(async (req) => {
     formData.append('output', 'json');
     formData.append('mobile', recipient_phone);
     formData.append('sendMethod', 'quick');
-    formData.append('msgType', 'text');
+    formData.append('msgType', msgType);
     
     // Add template name if provided
     if (template_name) {
       formData.append('templateName', template_name);
     }
 
-    // Log the complete request details (matching your format)
+    // Add media fields if this is a media message
+    if (isMediaMessage) {
+      formData.append('mediaId', media_id);
+      formData.append('mediaType', media_type);
+    }
+
+    // Log the complete request details
     console.log('=== WHATSAPP API REQUEST DETAILS ===');
     console.log('URL:', 'https://theultimate.io/WAApi/send');
     console.log('Method:', 'POST');
@@ -191,11 +204,22 @@ serve(async (req) => {
     console.log('  output:', 'json');
     console.log('  mobile:', recipient_phone);
     console.log('  sendMethod:', 'quick');
-    console.log('  msgType:', 'text');
+    console.log('  msgType:', msgType);
     console.log('  templateName:', template_name || 'NOT_PROVIDED');
+    if (isMediaMessage) {
+      console.log('  mediaId:', media_id);
+      console.log('  mediaType:', media_type);
+    }
     console.log('=== END REQUEST DETAILS ===');
+    
+    // Log the actual FormData for debugging
+    console.log('=== ACTUAL FORMDATA CONTENTS ===');
+    for (const [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value);
+    }
+    console.log('=== END FORMDATA CONTENTS ===');
 
-    // Send message via theultimate.io API (matching your exact format)
+    // Send message via theultimate.io API
     const whatsappResponse = await fetch('https://theultimate.io/WAApi/send', {
       method: 'POST',
       headers: {
@@ -259,10 +283,25 @@ serve(async (req) => {
     });
 
   } catch (error) {
+    console.error('=== EDGE FUNCTION ERROR ===');
     console.error('Error in send-whatsapp-message function:', error);
+    console.error('Error type:', typeof error);
+    console.error('Error constructor:', error?.constructor?.name);
+    console.error('Error message:', error.message || 'No message');
+    console.error('Error stack:', error.stack || 'No stack');
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      cause: error.cause
+    });
+    console.error('=== END ERROR DETAILS ===');
+    
     return new Response(JSON.stringify({
       success: false,
-      error: error.message || 'Internal server error'
+      error: error.message || 'Internal server error',
+      errorType: error.constructor?.name || 'Unknown',
+      timestamp: new Date().toISOString()
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

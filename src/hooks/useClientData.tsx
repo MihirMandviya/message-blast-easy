@@ -250,6 +250,10 @@ export const useClientData = () => {
 
       if (error) {
         console.error('Template creation error:', error);
+        // Handle unique constraint violation
+        if (error.code === '23505' && error.message.includes('templates_name_unique')) {
+          throw new Error('A template with this name already exists. Please choose a different name.');
+        }
         throw error;
       }
 
@@ -284,7 +288,13 @@ export const useClientData = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Handle unique constraint violation
+        if (error.code === '23505' && error.message.includes('templates_name_unique')) {
+          throw new Error('A template with this name already exists. Please choose a different name.');
+        }
+        throw error;
+      }
 
       const processedTemplate = {
         ...updatedTemplate,

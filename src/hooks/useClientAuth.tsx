@@ -8,6 +8,7 @@ interface ClientUser {
   phone_number: string;
   whatsapp_api_key: string | null;
   whatsapp_number: string | null;
+  user_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -56,6 +57,25 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
           const parsedSession = JSON.parse(storedSession) as ClientSession;
           // Validate session is still valid
           if (parsedSession.client && parsedSession.token) {
+            // Check if client data is missing user_id and refresh it
+            if (!parsedSession.client.user_id && parsedSession.client.id) {
+              try {
+                const { data, error } = await supabase
+                  .from('client_users')
+                  .select('*')
+                  .eq('id', parsedSession.client.id)
+                  .single();
+                
+                if (!error && data) {
+                  parsedSession.client = data;
+                  localStorage.setItem('client_session', JSON.stringify(parsedSession));
+                  console.log('Refreshed client session with complete data');
+                }
+              } catch (error) {
+                console.error('Error refreshing client data:', error);
+              }
+            }
+            
             setSession(parsedSession);
             setClient(parsedSession.client);
           } else {

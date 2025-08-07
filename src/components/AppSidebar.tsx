@@ -1,4 +1,4 @@
-import { MessageSquare, Send, Users, FileText, Settings, BarChart3, UserPlus, History, Shield, HelpCircle, LayoutTemplate, Workflow, Clock, Upload, Layers, Target, LogOut, User, Bell, ChevronRight } from "lucide-react";
+import { MessageSquare, Send, Users, FileText, Settings, BarChart3, UserPlus, History, Shield, HelpCircle, LayoutTemplate, Workflow, Clock, Upload, Layers, Target, LogOut, User, Bell, ChevronRight, Image } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useClientAuth } from '@/hooks/useClientAuth';
@@ -50,6 +50,11 @@ const clientItems = [
     title: "Scheduled", 
     url: "/scheduled", 
     icon: Clock
+  },
+  { 
+    title: "Media", 
+    url: "/media", 
+    icon: Image
   },
   { 
     title: "Support", 

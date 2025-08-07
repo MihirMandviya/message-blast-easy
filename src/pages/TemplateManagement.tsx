@@ -1,127 +1,118 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useTemplates } from '@/hooks/useTemplates';
+import { useClientAuth } from '@/hooks/useClientAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Layout, Edit, Trash2, Copy, Search, Filter, MessageSquare } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useClientAuth } from '@/hooks/useClientAuth';
-import { useClientData } from '@/hooks/useClientData';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, RefreshCw, Search, MessageSquare, FileText, Image, Video, Music, Calendar, Clock, Globe, Tag } from 'lucide-react';
+import { format } from 'date-fns';
 
-interface Template {
-  id: string;
-  name: string;
-  content: string;
-  category: string;
-  variables: string[];
-  created_at: string;
-  updated_at: string;
-}
-
-const TemplateManagement = () => {
+const TemplateManagement: React.FC = () => {
+  const { templates, isLoading, error, lastSync, syncTemplatesWithDatabase, getTemplatesByCategory, getTemplatesByLanguage, getTemplatesByMediaType } = useTemplates();
   const { client } = useClientAuth();
-  const { 
-    templates, 
-    loading, 
-    error, 
-    addTemplate, 
-    updateTemplate, 
-    deleteTemplate 
-  } = useClientData();
-  
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
-  const { toast } = useToast();
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
+  const [selectedMediaType, setSelectedMediaType] = useState<string>('all');
 
-  // Show error if exists
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive",
-      });
+  const filteredTemplates = useMemo(() => {
+    let filtered = templates;
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(item =>
+        item.template_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.template_body?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.template_header?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.template_footer?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     }
-  }, [error, toast]);
 
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(item => item.category === selectedCategory);
+    }
 
+    // Filter by language
+    if (selectedLanguage !== 'all') {
+      filtered = filtered.filter(item => item.language === selectedLanguage);
+    }
 
-  const handleUpdateTemplate = async () => {
-    if (!editingTemplate || !client) return;
+    // Filter by media type
+    if (selectedMediaType !== 'all') {
+      filtered = filtered.filter(item => item.media_type === selectedMediaType);
+    }
 
-    const updates = {
-      name: editingTemplate.name,
-      content: editingTemplate.content,
-      category: editingTemplate.category,
-      variables: extractVariables(editingTemplate.content)
-    };
+    return filtered;
+  }, [templates, searchTerm, selectedCategory, selectedLanguage, selectedMediaType]);
 
-    const { error } = await updateTemplate(editingTemplate.id, updates);
+  const templatesByCategory = {
+    marketing: getTemplatesByCategory('MARKETING'),
+    utility: getTemplatesByCategory('UTILITY'),
+    authentication: getTemplatesByCategory('AUTHENTICATION')
+  };
 
-    if (error) {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Template updated successfully",
-      });
-      setEditingTemplate(null);
+  const templatesByLanguage = {
+    english: getTemplatesByLanguage('en'),
+    marathi: getTemplatesByLanguage('mr'),
+    hindi: getTemplatesByLanguage('hi')
+  };
+
+  const templatesByMediaType = {
+    text: getTemplatesByMediaType('text'),
+    media: getTemplatesByMediaType('media'),
+    image: getTemplatesByMediaType('image'),
+    video: getTemplatesByMediaType('video'),
+    audio: getTemplatesByMediaType('audio')
+  };
+
+  const getMediaTypeIcon = (type: string) => {
+    switch (type) {
+      case 'text':
+        return <MessageSquare className="h-4 w-4" />;
+      case 'media':
+      case 'image':
+        return <Image className="h-4 w-4" />;
+      case 'video':
+        return <Video className="h-4 w-4" />;
+      case 'audio':
+        return <Music className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
     }
   };
 
-  const handleDeleteTemplate = async (id: string) => {
-    const { error } = await deleteTemplate(id);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Template deleted successfully",
-      });
+  const getLanguageName = (code: string) => {
+    switch (code) {
+      case 'en':
+        return 'English';
+      case 'mr':
+        return 'Marathi';
+      case 'hi':
+        return 'Hindi';
+      default:
+        return code.toUpperCase();
     }
   };
 
-  const extractVariables = (content: string): string[] => {
-    const variableRegex = /\{\{([^}]+)\}\}/g;
-    const variables: string[] = [];
-    let match;
-    
-    while ((match = variableRegex.exec(content)) !== null) {
-      if (!variables.includes(match[1].trim())) {
-        variables.push(match[1].trim());
-      }
-    }
-    
-    return variables;
+  const formatDate = (timestamp: number) => {
+    return format(new Date(timestamp), 'MMM dd, yyyy HH:mm');
   };
 
-  const filteredTemplates = templates.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         template.content.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || template.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
+  const handleSyncTemplates = async () => {
+    await syncTemplatesWithDatabase();
+  };
 
-  const categories = ['all', ...new Set(templates.map(t => t.category))].filter(Boolean);
-
-  if (loading) {
+  if (!client) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      <div className="flex items-center justify-center h-64">
+        <Alert>
+          <AlertDescription>Please log in to access template management.</AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -129,194 +120,248 @@ const TemplateManagement = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary via-primary/90 to-primary/80 -mx-6 -mt-6 px-6 py-8 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
-            <Layout className="h-6 w-6 text-white" />
-          </div>
-          <h2 className="text-3xl font-bold">Message Templates</h2>
-        </div>
-        <p className="text-white/90 text-lg">
-          View and manage reusable message templates for your WhatsApp campaigns
-        </p>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="flex gap-4 flex-1">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search templates..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Filter by category" />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map(category => (
-                <SelectItem key={category} value={category}>
-                  {category === 'all' ? 'All Categories' : String(category).charAt(0).toUpperCase() + String(category).slice(1)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Templates Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredTemplates.map((template) => (
-          <Card key={template.id} className="card-enhanced hover-lift">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">{template.name}</CardTitle>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="secondary" className="text-xs">
-                      {template.category}
-                    </Badge>
-                    {template.variables.length > 0 && (
-                      <Badge variant="outline" className="text-xs">
-                        {template.variables.length} variables
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingTemplate(template)}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteTemplate(template.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
-                {template.content}
-              </p>
-              {template.variables.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-xs font-medium text-muted-foreground mb-1">Variables:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {template.variables.map(variable => (
-                      <Badge key={variable} variant="outline" className="text-xs">
-                        {variable}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Use Template
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Copy className="h-4 w-4" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filteredTemplates.length === 0 && (
-        <div className="text-center py-12">
-          <Layout className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No templates found</h3>
-          <p className="text-muted-foreground mb-4">
-            {searchTerm || categoryFilter !== 'all' 
-              ? 'Try adjusting your search or filter criteria' 
-              : 'No templates available'}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Template Management</h1>
+          <p className="text-muted-foreground">
+            Manage your WhatsApp message templates
           </p>
         </div>
+        <div className="flex space-x-2">
+          <Button onClick={handleSyncTemplates} disabled={isLoading}>
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
+            {isLoading ? 'Syncing...' : 'Sync Templates'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Status Bar */}
+      <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex items-center space-x-4">
+          <span>Total Templates: {templates.length}</span>
+          <span>Marketing: {templatesByCategory.marketing.length}</span>
+          <span>Utility: {templatesByCategory.utility.length}</span>
+          <span>English: {templatesByLanguage.english.length}</span>
+          <span>Marathi: {templatesByLanguage.marathi.length}</span>
+        </div>
+        {lastSync && (
+          <div className="flex items-center space-x-2">
+            <Clock className="h-4 w-4" />
+            <span>Last synced: {format(lastSync, 'MMM dd, yyyy HH:mm:ss')}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
 
-      {/* Edit Dialog */}
-      <Dialog open={!!editingTemplate} onOpenChange={() => setEditingTemplate(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Template</DialogTitle>
-            <DialogDescription>
-              Update your message template
-            </DialogDescription>
-          </DialogHeader>
-          {editingTemplate && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-name">Template Name</Label>
-                <Input
-                  id="edit-name"
-                  value={editingTemplate.name}
-                  onChange={(e) => setEditingTemplate({ ...editingTemplate, name: e.target.value })}
-                  placeholder="Enter template name"
-                />
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search templates by name or content..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="MARKETING">Marketing</SelectItem>
+            <SelectItem value="UTILITY">Utility</SelectItem>
+            <SelectItem value="AUTHENTICATION">Authentication</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by language" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Languages</SelectItem>
+            <SelectItem value="en">English</SelectItem>
+            <SelectItem value="mr">Marathi</SelectItem>
+            <SelectItem value="hi">Hindi</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={selectedMediaType} onValueChange={setSelectedMediaType}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Filter by media type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="text">Text</SelectItem>
+            <SelectItem value="media">Media</SelectItem>
+            <SelectItem value="image">Image</SelectItem>
+            <SelectItem value="video">Video</SelectItem>
+            <SelectItem value="audio">Audio</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Templates Content */}
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="all">All Templates ({filteredTemplates.length})</TabsTrigger>
+          <TabsTrigger value="marketing">Marketing ({templatesByCategory.marketing.length})</TabsTrigger>
+          <TabsTrigger value="utility">Utility ({templatesByCategory.utility.length})</TabsTrigger>
+          <TabsTrigger value="english">English ({templatesByLanguage.english.length})</TabsTrigger>
+          <TabsTrigger value="marathi">Marathi ({templatesByLanguage.marathi.length})</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="space-y-4">
+          <TemplateGrid templates={filteredTemplates} />
+        </TabsContent>
+        <TabsContent value="marketing" className="space-y-4">
+          <TemplateGrid templates={templatesByCategory.marketing} />
+        </TabsContent>
+        <TabsContent value="utility" className="space-y-4">
+          <TemplateGrid templates={templatesByCategory.utility} />
+        </TabsContent>
+        <TabsContent value="english" className="space-y-4">
+          <TemplateGrid templates={templatesByLanguage.english} />
+        </TabsContent>
+        <TabsContent value="marathi" className="space-y-4">
+          <TemplateGrid templates={templatesByLanguage.marathi} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Empty State */}
+      {filteredTemplates.length === 0 && !isLoading && (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No templates found</h3>
+            <p className="text-muted-foreground text-center">
+              {searchTerm || selectedCategory !== 'all' || selectedLanguage !== 'all' || selectedMediaType !== 'all'
+                ? 'Try adjusting your filters to see more results.'
+                : 'Your templates will appear here once synced.'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+interface TemplateGridProps {
+  templates: any[];
+}
+
+const TemplateGrid: React.FC<TemplateGridProps> = ({ templates }) => {
+  const getMediaTypeIcon = (type: string) => {
+    switch (type) {
+      case 'text':
+        return <MessageSquare className="h-4 w-4" />;
+      case 'media':
+      case 'image':
+        return <Image className="h-4 w-4" />;
+      case 'video':
+        return <Video className="h-4 w-4" />;
+      case 'audio':
+        return <Music className="h-4 w-4" />;
+      default:
+        return <FileText className="h-4 w-4" />;
+    }
+  };
+
+  const getLanguageName = (code: string) => {
+    switch (code) {
+      case 'en':
+        return 'English';
+      case 'mr':
+        return 'Marathi';
+      case 'hi':
+        return 'Hindi';
+      default:
+        return code.toUpperCase();
+    }
+  };
+
+  const formatDate = (timestamp: number) => {
+    return format(new Date(timestamp), 'MMM dd, yyyy HH:mm');
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {templates.map((template) => (
+        <Card key={template.id} className="hover:shadow-md transition-shadow">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {getMediaTypeIcon(template.media_type)}
+                <Badge variant={template.whatsapp_status === 'enabled' ? 'default' : 'secondary'}>
+                  {template.whatsapp_status}
+                </Badge>
+                <Badge variant={template.system_status === 'enabled' ? 'default' : 'secondary'}>
+                  {template.system_status}
+                </Badge>
               </div>
-              <div>
-                <Label htmlFor="edit-category">Category</Label>
-                <Select value={editingTemplate.category} onValueChange={(value) => setEditingTemplate({ ...editingTemplate, category: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">General</SelectItem>
-                    <SelectItem value="welcome">Welcome</SelectItem>
-                    <SelectItem value="promotional">Promotional</SelectItem>
-                    <SelectItem value="reminder">Reminder</SelectItem>
-                    <SelectItem value="support">Support</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="edit-content">Message Content</Label>
-                <Textarea
-                  id="edit-content"
-                  value={editingTemplate.content}
-                  onChange={(e) => setEditingTemplate({ ...editingTemplate, content: e.target.value })}
-                  placeholder="Enter your message template... Use {{variable}} for dynamic content"
-                  rows={6}
-                />
-              </div>
-              {extractVariables(editingTemplate.content).length > 0 && (
-                <div>
-                  <Label>Detected Variables</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {extractVariables(editingTemplate.content).map(variable => (
-                      <Badge key={variable} variant="secondary">
-                        {variable}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditingTemplate(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleUpdateTemplate}>
-                  Update Template
-                </Button>
+              <Badge variant="outline" className="text-xs">
+                {template.media_type}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <h3 className="font-semibold text-sm truncate" title={template.template_name}>
+                {template.template_name}
+              </h3>
+              <div className="flex items-center space-x-2 mt-1">
+                <Globe className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">{getLanguageName(template.language)}</span>
+                <Tag className="h-3 w-3 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">{template.category}</span>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+            
+            {/* Template Content Preview */}
+            <div className="space-y-2">
+              {template.template_header && (
+                <div className="text-xs text-muted-foreground">
+                  <strong>Header:</strong> {template.template_header}
+                </div>
+              )}
+              {template.template_body && (
+                <div className="text-xs text-muted-foreground">
+                  <strong>Body:</strong> {template.template_body.length > 100 
+                    ? `${template.template_body.substring(0, 100)}...` 
+                    : template.template_body}
+                </div>
+              )}
+              {template.template_footer && (
+                <div className="text-xs text-muted-foreground">
+                  <strong>Footer:</strong> {template.template_footer}
+                </div>
+              )}
+              {template.buttons1_title && (
+                <div className="text-xs text-muted-foreground">
+                  <strong>Button:</strong> {template.buttons1_title} ({template.buttons1_type})
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <div className="flex items-center space-x-1">
+                <Calendar className="h-3 w-3" />
+                <span>Created: {formatDate(template.creation_time)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 };

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Webhook Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .webhook-url {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            margin-bottom: 20px;
+            word-break: break-all;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #495057;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        textarea {
+            height: 100px;
+            font-family: monospace;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .response {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .preset-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .preset-btn:hover {
+            background: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📱 WhatsApp Webhook Test</h1>
+        
+        <div class="webhook-url">
+            <strong>Webhook URL:</strong><br>
+            https://vvpamvhqdyanomqvtmiz.supabase.co/functions/v1/whatsapp-webhook
+        </div>
+
+        <div class="test-section">
+            <h3>Test Webhook</h3>
+            
+            <div class="preset-buttons">
+                <button class="preset-btn" onclick="loadPreset('delivered')">Delivered</button>
+                <button class="preset-btn" onclick="loadPreset('failed')">Failed</button>
+                <button class="preset-btn" onclick="loadPreset('sent')">Sent</button>
+                <button class="preset-btn" onclick="loadPreset('pending')">Pending</button>
+                <button class="preset-btn" onclick="loadPreset('custom')">Custom</button>
+            </div>
+
+            <div class="form-group">
+                <label for="mobile">Mobile Number:</label>
+                <input type="text" id="mobile" placeholder="919175442260" value="919175442260">
+            </div>
+
+            <div class="form-group">
+                <label for="status">Status:</label>
+                <select id="status">
+                    <option value="delivered">Delivered</option>
+                    <option value="failed">Failed</option>
+                    <option value="sent">Sent</option>
+                    <option value="pending">Pending</option>
+                    <option value="queued">Queued</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="reason">Reason (for failed status):</label>
+                <input type="text" id="reason" placeholder="Invalid phone number">
+            </div>
+
+            <div class="form-group">
+                <label for="transactionId">Transaction ID:</label>
+                <input type="text" id="transactionId" placeholder="1425628406555298614" value="1425628406555298614">
+            </div>
+
+            <div class="form-group">
+                <label for="msgId">Message ID:</label>
+                <input type="text" id="msgId" placeholder="test_msg_123" value="test_msg_123">
+            </div>
+
+            <div class="form-group">
+                <label for="timestamp">Timestamp:</label>
+                <input type="text" id="timestamp" placeholder="Auto-generated" readonly>
+            </div>
+
+            <button onclick="sendWebhook()">Send Webhook</button>
+
+            <div id="response" class="response" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>Raw JSON Payload</h3>
+            <div class="form-group">
+                <label for="rawPayload">JSON Payload:</label>
+                <textarea id="rawPayload" placeholder='{"mobile": "919175442260", "status": "delivered", "transactionId": "1425628406555298614"}'></textarea>
+            </div>
+            <button onclick="sendRawWebhook()">Send Raw JSON</button>
+        </div>
+    </div>
+
+    <script>
+        const webhookUrl = 'https://vvpamvhqdyanomqvtmiz.supabase.co/functions/v1/whatsapp-webhook';
+
+        // Update timestamp on page load
+        document.getElementById('timestamp').value = new Date().toISOString();
+
+        const presets = {
+            delivered: {
+                mobile: '919175442260',
+                status: 'delivered',
+                reason: '',
+                transactionId: '1425628406555298614',
+                msgId: 'test_msg_123'
+            },
+            failed: {
+                mobile: '917887766008',
+                status: 'failed',
+                reason: 'Invalid phone number',
+                transactionId: '860814411606149016',
+                msgId: 'test_msg_456'
+            },
+            sent: {
+                mobile: '919175442260',
+                status: 'sent',
+                reason: '',
+                transactionId: '1425628406555298614',
+                msgId: 'test_msg_789'
+            },
+            pending: {
+                mobile: '917887766008',
+                status: 'pending',
+                reason: '',
+                transactionId: '860814411606149016',
+                msgId: 'test_msg_101'
+            },
+            custom: {
+                mobile: '',
+                status: 'delivered',
+                reason: '',
+                transactionId: '',
+                msgId: ''
+            }
+        };
+
+        function loadPreset(presetName) {
+            const preset = presets[presetName];
+            document.getElementById('mobile').value = preset.mobile;
+            document.getElementById('status').value = preset.status;
+            document.getElementById('reason').value = preset.reason;
+            document.getElementById('transactionId').value = preset.transactionId;
+            document.getElementById('msgId').value = preset.msgId;
+            document.getElementById('timestamp').value = new Date().toISOString();
+        }
+
+        async function sendWebhook() {
+            const payload = {
+                mobile: document.getElementById('mobile').value,
+                status: document.getElementById('status').value,
+                reason: document.getElementById('reason').value,
+                transactionId: document.getElementById('transactionId').value,
+                msgId: document.getElementById('msgId').value,
+                timestamp: document.getElementById('timestamp').value
+            };
+
+            // Remove empty fields
+            Object.keys(payload).forEach(key => {
+                if (payload[key] === '') {
+                    delete payload[key];
+                }
+            });
+
+            await sendRequest(payload);
+        }
+
+        async function sendRawWebhook() {
+            const rawPayload = document.getElementById('rawPayload').value;
+            try {
+                const payload = JSON.parse(rawPayload);
+                await sendRequest(payload);
+            } catch (error) {
+                showResponse('Error: Invalid JSON format', 'error');
+            }
+        }
+
+        async function sendRequest(payload) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.style.display = 'block';
+            responseDiv.className = 'response';
+            responseDiv.textContent = 'Sending webhook...';
+
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.text();
+                
+                let responseText = `Status: ${response.status}\n`;
+                responseText += `Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()), null, 2)}\n\n`;
+                responseText += `Response:\n${result}`;
+
+                try {
+                    const parsedResult = JSON.parse(result);
+                    responseText += `\n\nParsed Response:\n${JSON.stringify(parsedResult, null, 2)}`;
+                } catch (e) {
+                    // Response is not JSON, that's fine
+                }
+
+                showResponse(responseText, response.ok ? 'success' : 'error');
+            } catch (error) {
+                showResponse(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        function showResponse(text, type) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.style.display = 'block';
+            responseDiv.className = `response ${type}`;
+            responseDiv.textContent = text;
+        }
+
+        // Load delivered preset by default
+        loadPreset('delivered');
+    </script>
+</body>
+</html> 

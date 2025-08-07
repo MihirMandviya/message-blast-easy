@@ -27,9 +27,9 @@ export function DateTimePicker({
   placeholder = "Pick a date and time",
   className,
 }: DateTimePickerProps) {
-  // Store the local date and time separately to avoid timezone confusion
+  // Store the local date and time separately
   const [localDate, setLocalDate] = React.useState<Date | undefined>(
-    value ? new Date(value.getTime() + value.getTimezoneOffset() * 60000) : undefined
+    value ? new Date(value) : undefined
   );
   const [timeValue, setTimeValue] = React.useState<string>(
     value ? format(value, "HH:mm") : ""
@@ -37,10 +37,8 @@ export function DateTimePicker({
 
   React.useEffect(() => {
     if (value) {
-      // Convert UTC value back to local for display
-      const localValue = new Date(value.getTime() + value.getTimezoneOffset() * 60000);
-      setLocalDate(localValue);
-      setTimeValue(format(localValue, "HH:mm"));
+      setLocalDate(new Date(value));
+      setTimeValue(format(value, "HH:mm"));
     } else {
       setLocalDate(undefined);
       setTimeValue("");
@@ -51,17 +49,15 @@ export function DateTimePicker({
   const createUTCDate = (date: Date, timeString: string): Date => {
     const [hours, minutes] = timeString.split(":").map(Number);
     
-    // Create a new date object with the selected date
+    // Create a new date object with the selected date and time
     const combinedDate = new Date(date);
     combinedDate.setHours(hours || 0);
     combinedDate.setMinutes(minutes || 0);
     combinedDate.setSeconds(0);
     combinedDate.setMilliseconds(0);
     
-    // Convert to UTC by subtracting the timezone offset
-    const utcDate = new Date(combinedDate.getTime() - combinedDate.getTimezoneOffset() * 60000);
-    
-    return utcDate;
+    // Return the date as-is (it will be automatically converted to UTC when toISOString() is called)
+    return combinedDate;
   };
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -78,9 +74,8 @@ export function DateTimePicker({
         
         if (utcDateTime <= now) {
           // If it's in the past, set it to 1 minute from now
-          const futureLocal = new Date(oneMinuteFromNow.getTime() + oneMinuteFromNow.getTimezoneOffset() * 60000);
-          setLocalDate(futureLocal);
-          setTimeValue(format(futureLocal, "HH:mm"));
+          setLocalDate(oneMinuteFromNow);
+          setTimeValue(format(oneMinuteFromNow, "HH:mm"));
           onChange?.(oneMinuteFromNow);
         } else {
           onChange?.(utcDateTime);
@@ -108,9 +103,8 @@ export function DateTimePicker({
       
       if (utcDateTime <= now) {
         // If it's in the past, set it to 1 minute from now
-        const futureLocal = new Date(oneMinuteFromNow.getTime() + oneMinuteFromNow.getTimezoneOffset() * 60000);
-        setLocalDate(futureLocal);
-        setTimeValue(format(futureLocal, "HH:mm"));
+        setLocalDate(oneMinuteFromNow);
+        setTimeValue(format(oneMinuteFromNow, "HH:mm"));
         onChange?.(oneMinuteFromNow);
       } else {
         onChange?.(utcDateTime);
@@ -126,9 +120,8 @@ export function DateTimePicker({
       
       if (utcDateTime <= now) {
         // If it's in the past, set it to 1 minute from now
-        const futureLocal = new Date(oneMinuteFromNow.getTime() + oneMinuteFromNow.getTimezoneOffset() * 60000);
-        setLocalDate(futureLocal);
-        setTimeValue(format(futureLocal, "HH:mm"));
+        setLocalDate(oneMinuteFromNow);
+        setTimeValue(format(oneMinuteFromNow, "HH:mm"));
         onChange?.(oneMinuteFromNow);
       } else {
         setLocalDate(today);
