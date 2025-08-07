@@ -35,7 +35,14 @@ export const useClientData = () => {
       const [contactsResult, templatesResult, messagesResult, campaignsResult] = await Promise.all([
         supabase
           .from('contacts')
-          .select('*')
+          .select(`
+            *,
+            groups(
+              id,
+              name,
+              description
+            )
+          `)
           .eq('user_id', client.id)
           .order('created_at', { ascending: false }),
         supabase
@@ -62,8 +69,14 @@ export const useClientData = () => {
       if (messagesResult.error) throw messagesResult.error;
       if (campaignsResult.error) throw campaignsResult.error;
 
+      // Process contacts to flatten group information
+      const processedContacts = (contactsResult.data || []).map(contact => ({
+        ...contact,
+        groups: contact.groups ? [contact.groups] : []
+      }));
+
       setData({
-        contacts: contactsResult.data || [],
+        contacts: processedContacts,
         templates: (templatesResult.data || []).map(template => ({
           ...template,
           variables: Array.isArray(template.variables) 
@@ -131,7 +144,14 @@ export const useClientData = () => {
       const { data: newContact, error } = await supabase
         .from('contacts')
         .insert([{ ...contactData, user_id: client.id }])
-        .select()
+        .select(`
+          *,
+          groups(
+            id,
+            name,
+            description
+          )
+        `)
         .single();
 
       if (error) {
@@ -139,12 +159,17 @@ export const useClientData = () => {
         throw error;
       }
 
+      const processedContact = {
+        ...newContact,
+        groups: newContact.groups ? [newContact.groups] : []
+      };
+
       setData(prev => ({
         ...prev,
-        contacts: [newContact, ...prev.contacts]
+        contacts: [processedContact, ...prev.contacts]
       }));
 
-      return { data: newContact, error: null };
+      return { data: processedContact, error: null };
     } catch (error) {
       console.error('Add contact error:', error);
       return { error: error instanceof Error ? error.message : 'Failed to add contact' };
@@ -160,19 +185,31 @@ export const useClientData = () => {
         .update(updates)
         .eq('id', id)
         .eq('user_id', client.id)
-        .select()
+        .select(`
+          *,
+          groups(
+            id,
+            name,
+            description
+          )
+        `)
         .single();
 
       if (error) throw error;
 
+      const processedContact = {
+        ...updatedContact,
+        groups: updatedContact.groups ? [updatedContact.groups] : []
+      };
+
       setData(prev => ({
         ...prev,
         contacts: prev.contacts.map(contact => 
-          contact.id === id ? updatedContact : contact
+          contact.id === id ? processedContact : contact
         )
       }));
 
-      return { data: updatedContact, error: null };
+      return { data: processedContact, error: null };
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Failed to update contact' };
     }

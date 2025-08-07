@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "12.2.3 (519615d)"
+    PostgrestVersion: "13.0.4"
   }
   public: {
     Tables: {
@@ -133,6 +133,7 @@ export type Database = {
           delivered_count: number | null
           description: string | null
           failed_count: number | null
+          group_id: string | null
           id: string
           message_content: string
           message_type: string
@@ -141,8 +142,10 @@ export type Database = {
           sent_count: number | null
           status: string
           target_groups: string[] | null
+          template_id: string | null
           updated_at: string
           user_id: string
+          variable_mappings: Json | null
         }
         Insert: {
           client_id?: string | null
@@ -150,6 +153,7 @@ export type Database = {
           delivered_count?: number | null
           description?: string | null
           failed_count?: number | null
+          group_id?: string | null
           id?: string
           message_content: string
           message_type?: string
@@ -158,8 +162,10 @@ export type Database = {
           sent_count?: number | null
           status?: string
           target_groups?: string[] | null
+          template_id?: string | null
           updated_at?: string
           user_id: string
+          variable_mappings?: Json | null
         }
         Update: {
           client_id?: string | null
@@ -167,6 +173,7 @@ export type Database = {
           delivered_count?: number | null
           description?: string | null
           failed_count?: number | null
+          group_id?: string | null
           id?: string
           message_content?: string
           message_type?: string
@@ -175,8 +182,10 @@ export type Database = {
           sent_count?: number | null
           status?: string
           target_groups?: string[] | null
+          template_id?: string | null
           updated_at?: string
           user_id?: string
+          variable_mappings?: Json | null
         }
         Relationships: [
           {
@@ -184,6 +193,20 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaigns_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
             referencedColumns: ["id"]
           },
         ]
@@ -278,6 +301,7 @@ export type Database = {
           subscription_expires_at: string | null
           subscription_plan: string
           updated_at: string
+          user_id: string | null
           whatsapp_api_key: string | null
           whatsapp_number: string | null
         }
@@ -294,6 +318,7 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_plan?: string
           updated_at?: string
+          user_id?: string | null
           whatsapp_api_key?: string | null
           whatsapp_number?: string | null
         }
@@ -310,6 +335,7 @@ export type Database = {
           subscription_expires_at?: string | null
           subscription_plan?: string
           updated_at?: string
+          user_id?: string | null
           whatsapp_api_key?: string | null
           whatsapp_number?: string | null
         }
@@ -365,6 +391,7 @@ export type Database = {
           created_at: string
           custom_fields: Json | null
           email: string | null
+          group_id: string
           id: string
           name: string
           notes: string | null
@@ -378,6 +405,7 @@ export type Database = {
           created_at?: string
           custom_fields?: Json | null
           email?: string | null
+          group_id: string
           id?: string
           name: string
           notes?: string | null
@@ -391,6 +419,7 @@ export type Database = {
           created_at?: string
           custom_fields?: Json | null
           email?: string | null
+          group_id?: string
           id?: string
           name?: string
           notes?: string | null
@@ -405,6 +434,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "client_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
             referencedColumns: ["id"]
           },
         ]
@@ -543,6 +579,7 @@ export type Database = {
       }
       messages: {
         Row: {
+          campaign_id: string | null
           client_id: string | null
           created_at: string
           error_message: string | null
@@ -556,6 +593,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          campaign_id?: string | null
           client_id?: string | null
           created_at?: string
           error_message?: string | null
@@ -569,6 +607,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          campaign_id?: string | null
           client_id?: string | null
           created_at?: string
           error_message?: string | null
@@ -582,6 +621,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "messages_client_id_fkey"
             columns: ["client_id"]
@@ -600,6 +646,7 @@ export type Database = {
           id: string
           updated_at: string
           user_id: string
+          user_id_string: string | null
           whatsapp_api_key: string | null
           whatsapp_number: string | null
         }
@@ -611,6 +658,7 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id: string
+          user_id_string?: string | null
           whatsapp_api_key?: string | null
           whatsapp_number?: string | null
         }
@@ -622,6 +670,7 @@ export type Database = {
           id?: string
           updated_at?: string
           user_id?: string
+          user_id_string?: string | null
           whatsapp_api_key?: string | null
           whatsapp_number?: string | null
         }
@@ -863,12 +912,34 @@ export type Database = {
         Args: { email_input: string; password_input: string }
         Returns: Json
       }
+      export_contacts_to_csv: {
+        Args: { group_id?: string; client_id?: string }
+        Returns: string
+      }
+      get_contacts_with_groups: {
+        Args: { client_id?: string; group_id?: string }
+        Returns: {
+          id: string
+          name: string
+          phone: string
+          email: string
+          tags: string[]
+          notes: string
+          created_at: string
+          updated_at: string
+          groups: Json
+        }[]
+      }
       has_role: {
         Args: {
           _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
         }
         Returns: boolean
+      }
+      import_contacts_from_csv: {
+        Args: { csv_data: string; group_id: string; client_id?: string }
+        Returns: Json
       }
       is_active_client_user: {
         Args: { user_id_param: string }

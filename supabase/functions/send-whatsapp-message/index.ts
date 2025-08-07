@@ -10,6 +10,8 @@ interface WhatsAppMessageRequest {
   recipient_phone: string;
   message_content: string;
   message_type: string;
+  template_name?: string;
+  campaign_id?: string;
 }
 
 serve(async (req) => {
@@ -22,7 +24,7 @@ serve(async (req) => {
     // Get Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''  // Use service role key for client auth
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
     // Get the authorization header
@@ -44,9 +46,7 @@ serve(async (req) => {
     console.log('Token length:', token.length);
     console.log('Token preview:', token.substring(0, 10) + '...');
     
-    // Validate client session with a simpler query first
-    console.log('Searching for token:', token);
-    
+    // Validate client session
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('client_sessions')
       .select(`
@@ -58,6 +58,7 @@ serve(async (req) => {
           business_name,
           whatsapp_api_key,
           whatsapp_number,
+          user_id,
           is_active
         )
       `)
@@ -101,7 +102,18 @@ serve(async (req) => {
     }
 
     // Get the request body
-    const { recipient_phone, message_content, message_type }: WhatsAppMessageRequest = await req.json();
+    const { recipient_phone, message_content, message_type, template_name, campaign_id }: WhatsAppMessageRequest = await req.json();
+
+    // Validate required fields
+    if (!recipient_phone || !message_content) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing required fields: recipient_phone and message_content'
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Create message record in database
     const { data: messageRecord, error: messageError } = await supabaseClient
@@ -110,7 +122,8 @@ serve(async (req) => {
         user_id: client.id,
         recipient_phone,
         message_content,
-        message_type,
+        message_type: message_type || 'text',
+        campaign_id,
         status: 'pending'
       })
       .select()
@@ -118,9 +131,12 @@ serve(async (req) => {
 
     if (messageError) {
       console.error('Message creation error:', messageError);
-      return new Response('Failed to create message record', { 
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Failed to create message record: ' + messageError.message
+      }), { 
         status: 500, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -145,38 +161,79 @@ serve(async (req) => {
       });
     }
 
-    // Create FormData for the WhatsApp API
+    // Create FormData for the theultimate.io WhatsApp API (matching exact format)
     const formData = new FormData();
-    formData.append('userid', client.whatsapp_api_key); // Using API key as userid
+    formData.append('userid', client.user_id || client.id);
     formData.append('msg', message_content);
     formData.append('wabaNumber', client.whatsapp_number);
-    formData.append('mobile', recipient_phone);
-    formData.append('msgType', message_type);
-    formData.append('sendMethod', 'quick');
     formData.append('output', 'json');
+    formData.append('mobile', recipient_phone);
+    formData.append('sendMethod', 'quick');
+    formData.append('msgType', 'text');
+    
+    // Add template name if provided
+    if (template_name) {
+      formData.append('templateName', template_name);
+    }
 
-    // Send message via theultimate.io API
+    // Log the complete request details (matching your format)
+    console.log('=== WHATSAPP API REQUEST DETAILS ===');
+    console.log('URL:', 'https://theultimate.io/WAApi/send');
+    console.log('Method:', 'POST');
+    console.log('Headers:', {
+      'apikey': client.whatsapp_api_key ? '***' + client.whatsapp_api_key.slice(-4) : 'NOT_SET',
+      'Cookie': 'SERVERID=webC1'
+    });
+    console.log('FormData Body:');
+    console.log('  userid:', client.user_id || client.id);
+    console.log('  msg:', message_content);
+    console.log('  wabaNumber:', client.whatsapp_number);
+    console.log('  output:', 'json');
+    console.log('  mobile:', recipient_phone);
+    console.log('  sendMethod:', 'quick');
+    console.log('  msgType:', 'text');
+    console.log('  templateName:', template_name || 'NOT_PROVIDED');
+    console.log('=== END REQUEST DETAILS ===');
+
+    // Send message via theultimate.io API (matching your exact format)
     const whatsappResponse = await fetch('https://theultimate.io/WAApi/send', {
       method: 'POST',
       headers: {
         'apikey': client.whatsapp_api_key,
+        'Cookie': 'SERVERID=webC1'
       },
       body: formData
     });
 
-    const whatsappResult = await whatsappResponse.json();
-    console.log('WhatsApp API response:', whatsappResult);
+    const whatsappResult = await whatsappResponse.text();
+    
+    // Log the complete response details
+    console.log('=== WHATSAPP API RESPONSE DETAILS ===');
+    console.log('Response Status:', whatsappResponse.status);
+    console.log('Response Status Text:', whatsappResponse.statusText);
+    console.log('Response Headers:', Object.fromEntries(whatsappResponse.headers.entries()));
+    console.log('Raw Response Body:', whatsappResult);
+    
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(whatsappResult);
+      console.log('Parsed JSON Response:', parsedResult);
+    } catch (e) {
+      parsedResult = { status: 'error', message: whatsappResult };
+      console.log('Failed to parse JSON, treating as text:', whatsappResult);
+    }
+    console.log('=== END RESPONSE DETAILS ===');
 
     // Update message status based on response
     const updateData: any = {
       sent_at: new Date().toISOString()
     };
 
-    if (whatsappResponse.ok && whatsappResult.status === 'success') {
+    if (whatsappResponse.ok && parsedResult.status === 'success') {
       updateData.status = 'sent';
     } else {
       updateData.status = 'failed';
-      updateData.error_message = whatsappResult.message || 'Failed to send message';
+      updateData.error_message = parsedResult.message || parsedResult.reason || 'Failed to send message';
     }
 
     // Update message record with result
@@ -196,7 +253,7 @@ serve(async (req) => {
       message: updateData.status === 'sent' ? 'Message sent successfully' : 'Message failed to send',
       message_id: messageRecord.id,
       status: updateData.status,
-      whatsapp_response: whatsappResult
+      whatsapp_response: parsedResult
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

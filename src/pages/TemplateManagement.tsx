@@ -3,11 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Layout, Plus, Edit, Trash2, Copy, Search, Filter, MessageSquare, Zap } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Layout, Edit, Trash2, Copy, Search, Filter, MessageSquare } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useClientAuth } from '@/hooks/useClientAuth';
@@ -36,14 +35,7 @@ const TemplateManagement = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
-  const [newTemplate, setNewTemplate] = useState({
-    name: '',
-    content: '',
-    category: 'general',
-    variables: []
-  });
   const { toast } = useToast();
 
   // Show error if exists
@@ -57,31 +49,7 @@ const TemplateManagement = () => {
     }
   }, [error, toast]);
 
-  const handleCreateTemplate = async () => {
-    if (!client) return;
 
-    const templateData = {
-      ...newTemplate,
-      variables: extractVariables(newTemplate.content)
-    };
-
-    const { error } = await addTemplate(templateData);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Success",
-        description: "Template created successfully",
-      });
-      setNewTemplate({ name: '', content: '', category: 'general', variables: [] });
-      setIsCreateDialogOpen(false);
-    }
-  };
 
   const handleUpdateTemplate = async () => {
     if (!editingTemplate || !client) return;
@@ -169,7 +137,7 @@ const TemplateManagement = () => {
           <h2 className="text-3xl font-bold">Message Templates</h2>
         </div>
         <p className="text-white/90 text-lg">
-          Create and manage reusable message templates for your WhatsApp campaigns
+          View and manage reusable message templates for your WhatsApp campaigns
         </p>
       </div>
 
@@ -199,82 +167,6 @@ const TemplateManagement = () => {
             </SelectContent>
           </Select>
         </div>
-        
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Template
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create New Template</DialogTitle>
-              <DialogDescription>
-                Create a reusable message template with variables
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="name">Template Name</Label>
-                <Input
-                  id="name"
-                  value={newTemplate.name}
-                  onChange={(e) => setNewTemplate({ ...newTemplate, name: e.target.value })}
-                  placeholder="Enter template name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Select value={newTemplate.category} onValueChange={(value) => setNewTemplate({ ...newTemplate, category: value })}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">General</SelectItem>
-                    <SelectItem value="welcome">Welcome</SelectItem>
-                    <SelectItem value="promotional">Promotional</SelectItem>
-                    <SelectItem value="reminder">Reminder</SelectItem>
-                    <SelectItem value="support">Support</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="content">Message Content</Label>
-                <Textarea
-                  id="content"
-                  value={newTemplate.content}
-                  onChange={(e) => setNewTemplate({ ...newTemplate, content: e.target.value })}
-                  placeholder="Enter your message template... Use {{variable}} for dynamic content"
-                  rows={6}
-                />
-                <p className="text-sm text-muted-foreground mt-2">
-                  Use double curly braces for variables: {`{{name}}, {{company}}, {{date}}`}
-                </p>
-              </div>
-              {extractVariables(newTemplate.content).length > 0 && (
-                <div>
-                  <Label>Detected Variables</Label>
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {extractVariables(newTemplate.content).map(variable => (
-                      <Badge key={variable} variant="secondary">
-                        {variable}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCreateTemplate}>
-                  Create Template
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Templates Grid */}
@@ -351,12 +243,8 @@ const TemplateManagement = () => {
           <p className="text-muted-foreground mb-4">
             {searchTerm || categoryFilter !== 'all' 
               ? 'Try adjusting your search or filter criteria' 
-              : 'Create your first message template to get started'}
+              : 'No templates available'}
           </p>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create First Template
-          </Button>
         </div>
       )}
 

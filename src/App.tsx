@@ -13,7 +13,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AdminAuth from "./pages/AdminAuth";
 import Dashboard from "./pages/Dashboard";
-import SendMessage from "./pages/SendMessage";
+import Campaigns from "./pages/Campaigns";
 import MessageHistory from "./pages/MessageHistory";
 import SettingsPage from "./pages/SettingsPage";
 import UserManagement from "./pages/UserManagement";
@@ -21,8 +21,10 @@ import SupportTickets from "./pages/SupportTickets";
 import AdminDashboard from "./pages/AdminDashboard";
 import TemplateManagement from "./pages/TemplateManagement";
 import ContactManagement from "./pages/ContactManagement";
+import ListContacts from "./pages/ListContacts";
 import ScheduledMessages from "./pages/ScheduledMessages";
 import ClientManagement from "./pages/ClientManagement";
+import TimezoneTest from "./pages/TimezoneTest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,13 +50,13 @@ const App = () => (
                   </DashboardLayout>
                 </ProtectedRoute>
               } />
-              <Route path="/send" element={
-                <ProtectedRoute>
-                  <DashboardLayout>
-                    <SendMessage />
-                  </DashboardLayout>
-                </ProtectedRoute>
-              } />
+                      <Route path="/campaigns" element={
+          <ProtectedRoute>
+            <DashboardLayout>
+              <Campaigns />
+            </DashboardLayout>
+          </ProtectedRoute>
+        } />
               <Route path="/messages" element={
                 <ProtectedRoute>
                   <DashboardLayout>
@@ -76,10 +78,24 @@ const App = () => (
                   </DashboardLayout>
                 </ProtectedRoute>
               } />
+              <Route path="/contacts/list/:listId" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <ListContacts />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
               <Route path="/scheduled" element={
                 <ProtectedRoute>
                   <DashboardLayout>
                     <ScheduledMessages />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+              <Route path="/timezone-test" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <TimezoneTest />
                   </DashboardLayout>
                 </ProtectedRoute>
               } />

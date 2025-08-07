@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { DateTimePicker } from '@/components/ui/date-time-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -13,7 +12,8 @@ import { Clock, Plus, Edit, Trash2, Search, Calendar as CalendarIcon, Play, Paus
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useClientAuth } from '@/hooks/useClientAuth';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { cn } from '@/lib/utils';
 
 interface ScheduledMessage {
@@ -28,6 +28,14 @@ interface ScheduledMessage {
   updated_at: string;
 }
 
+interface ScheduledMessageForm {
+  recipient_phone: string;
+  recipient_name: string;
+  message_content: string;
+  message_type: string;
+  scheduled_for: Date;
+}
+
 const ScheduledMessages = () => {
   const [scheduledMessages, setScheduledMessages] = useState<ScheduledMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,15 +43,20 @@ const ScheduledMessages = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingMessage, setEditingMessage] = useState<ScheduledMessage | null>(null);
-  const [newMessage, setNewMessage] = useState({
+  const [newMessage, setNewMessage] = useState<ScheduledMessageForm>({
     recipient_phone: '',
     recipient_name: '',
     message_content: '',
     message_type: 'text',
     scheduled_for: new Date(),
   });
-  const { user } = useAuth();
+  const { client } = useClientAuth();
+  const { admin } = useAdminAuth();
   const { toast } = useToast();
+  
+  // Determine current user
+  const user = client || admin;
+  const isAdmin = !!admin;
 
   useEffect(() => {
     fetchScheduledMessages();
@@ -51,9 +64,12 @@ const ScheduledMessages = () => {
 
   const fetchScheduledMessages = async () => {
     try {
+      if (!user) return;
+      
       const { data, error } = await supabase
         .from('scheduled_messages')
         .select('*')
+        .eq('user_id', user.id)
         .order('scheduled_for', { ascending: true });
 
       if (error) throw error;
@@ -79,6 +95,7 @@ const ScheduledMessages = () => {
         .insert([{
           ...newMessage,
           user_id: user.id,
+          client_id: isAdmin ? null : user.id,
           recipient_name: newMessage.recipient_name || null,
           scheduled_for: newMessage.scheduled_for.toISOString(),
         }]);
@@ -96,7 +113,7 @@ const ScheduledMessages = () => {
         message_content: '',
         message_type: 'text',
         scheduled_for: new Date(),
-      });
+      } as ScheduledMessageForm);
       setIsCreateDialogOpen(false);
       fetchScheduledMessages();
     } catch (error) {
@@ -205,6 +222,17 @@ const ScheduledMessages = () => {
     );
   }
 
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">Authentication Required</h3>
+          <p className="text-muted-foreground">Please log in to access scheduled messages.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -303,30 +331,14 @@ const ScheduledMessages = () => {
               </div>
               <div>
                 <Label>Schedule Date & Time *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !newMessage.scheduled_for && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {newMessage.scheduled_for ? format(newMessage.scheduled_for, "PPP 'at' p") : <span>Pick a date and time</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={newMessage.scheduled_for}
-                      onSelect={(date) => date && setNewMessage({ ...newMessage, scheduled_for: date })}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <DateTimePicker
+                  value={newMessage.scheduled_for}
+                  onChange={(date) => setNewMessage({ ...newMessage, scheduled_for: date })}
+                  placeholder="Pick a date and time"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Time shown in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone})
+                </p>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
