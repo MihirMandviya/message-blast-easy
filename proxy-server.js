@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import fetch from 'node-fetch';
+import fs from 'fs';
 
 const app = express();
 const PORT = 3001;
@@ -8,6 +9,14 @@ const PORT = 3001;
 // Enable CORS for all routes
 app.use(cors());
 app.use(express.json());
+
+// Function to log to file
+const logToFile = (message) => {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  fs.appendFileSync('api-requests.log', logMessage);
+  console.log(message);
+};
 
 // Proxy endpoint for media API
 app.post('/api/fetch-media', async (req, res) => {
@@ -18,7 +27,15 @@ app.post('/api/fetch-media', async (req, res) => {
       return res.status(400).json({ error: 'Missing userId or apiKey' });
     }
 
-    console.log('Proxying media request for userId:', userId);
+    logToFile('=== MEDIA API REQUEST DETAILS ===');
+    logToFile(`User ID: ${userId}`);
+    logToFile(`API Key: ${apiKey}`);
+    logToFile(`Full URL: https://theultimate.io/WAApi/media?userid=${userId}&output=json`);
+    logToFile(`Request Headers: ${JSON.stringify({
+      'apiKey': apiKey,
+      'Cookie': 'SERVERID=webC1'
+    }, null, 2)}`);
+    logToFile('================================');
 
     const response = await fetch(`https://theultimate.io/WAApi/media?userid=${userId}&output=json`, {
       method: 'GET',
@@ -30,7 +47,7 @@ app.post('/api/fetch-media', async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('API Error:', errorText);
+      logToFile(`API Error: ${errorText}`);
       return res.status(response.status).json({ 
         error: `HTTP error! status: ${response.status}`,
         details: errorText
@@ -54,7 +71,7 @@ app.post('/api/fetch-media', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Proxy error:', error);
+    logToFile(`Proxy error: ${error.message}`);
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message
@@ -71,7 +88,15 @@ app.post('/api/fetch-templates', async (req, res) => {
       return res.status(400).json({ error: 'Missing userId, password, or wabaNumber' });
     }
 
-    console.log('Proxying templates request for userId:', userId);
+    logToFile('=== TEMPLATES API REQUEST DETAILS ===');
+    logToFile(`User ID: ${userId}`);
+    logToFile(`Password: ${password}`);
+    logToFile(`WhatsApp Number: ${wabaNumber}`);
+    logToFile(`Full URL: https://theultimate.io/WAApi/template?userid=${userId}&password=${password}&wabaNumber=${wabaNumber}&output=json`);
+    logToFile(`Request Headers: ${JSON.stringify({
+      'Cookie': 'SERVERID=webC1'
+    }, null, 2)}`);
+    logToFile('====================================');
 
     const response = await fetch(`https://theultimate.io/WAApi/template?userid=${userId}&password=${password}&wabaNumber=${wabaNumber}&output=json`, {
       method: 'GET',
@@ -82,7 +107,7 @@ app.post('/api/fetch-templates', async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('API Error:', errorText);
+      logToFile(`API Error: ${errorText}`);
       return res.status(response.status).json({ 
         error: `HTTP error! status: ${response.status}`,
         details: errorText
@@ -105,7 +130,7 @@ app.post('/api/fetch-templates', async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Proxy error:', error);
+    logToFile(`Proxy error: ${error.message}`);
     return res.status(500).json({ 
       error: 'Internal server error',
       details: error.message
@@ -114,5 +139,5 @@ app.post('/api/fetch-templates', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Proxy server running on http://localhost:${PORT}`);
+  logToFile(`Proxy server running on http://localhost:${PORT}`);
 }); 

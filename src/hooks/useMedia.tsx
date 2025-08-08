@@ -107,6 +107,10 @@ export const useMedia = () => {
         console.log('Returning media data:', data.media);
         return data.media;
       } else {
+        // Check if it's an invalid credentials error
+        if (data.error && data.error.includes('Invalid credentials')) {
+          throw new Error('Invalid API credentials. Please contact your administrator to update your WhatsApp Business API credentials.');
+        }
         throw new Error(data.error || 'Failed to fetch media');
       }
     } catch (error) {

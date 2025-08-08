@@ -28,7 +28,7 @@ interface ClientAuthContextType {
   client: ClientUser | null;
   session: ClientSession | null;
   isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signIn: (identifier: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
 }
@@ -92,17 +92,28 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
     initializeAuth();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (identifier: string, password: string) => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('authenticate_client', {
-        email_input: email,
+      // First try to authenticate with user_id
+      let { data, error } = await supabase.rpc('authenticate_client_by_user_id', {
+        user_id_input: identifier,
         password_input: password
       });
 
-      if (error) {
-        setIsLoading(false);
-        return { error: error.message };
+      // If that fails, try with email (backward compatibility)
+      if (error || !data || !data.success) {
+        const { data: emailData, error: emailError } = await supabase.rpc('authenticate_client', {
+          email_input: identifier,
+          password_input: password
+        });
+
+        if (emailError || !emailData || !emailData.success) {
+          setIsLoading(false);
+          return { error: 'Invalid User ID/Email or password' };
+        }
+
+        data = emailData;
       }
 
       const response = data as any;
@@ -120,7 +131,7 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
         return { error: null };
       } else {
         setIsLoading(false);
-        return { error: response.error };
+        return { error: response.error || 'Authentication failed' };
       }
     } catch (error) {
       setIsLoading(false);

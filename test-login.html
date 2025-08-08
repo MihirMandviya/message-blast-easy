@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-primary { background-color: #007bff; color: white; }
+        .btn-secondary { background-color: #6c757d; color: white; }
+    </style>
+</head>
+<body>
+    <h1>Login Functionality Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Client Login</h2>
+        <p>User ID: nandlal</p>
+        <p>Password: password123</p>
+        <button class="btn-primary" onclick="testClientLogin()">Test Client Login</button>
+        <div id="client-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Admin Login</h2>
+        <p>Email: admin@whatsapp-hub.com</p>
+        <p>Password: admin123</p>
+        <button class="btn-primary" onclick="testAdminLogin()">Test Admin Login</button>
+        <div id="admin-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test API Endpoints</h2>
+        <button class="btn-secondary" onclick="testProxyServer()">Test Proxy Server</button>
+        <div id="proxy-result"></div>
+    </div>
+
+    <script>
+        async function testClientLogin() {
+            const resultDiv = document.getElementById('client-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('https://vvpamvhqdyanomqvtmiz.supabase.co/rest/v1/rpc/authenticate_client_by_user_id', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cGFtdmhxZHlhbm9tcXZ0bWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2Njc5NTYsImV4cCI6MjA2ODI0Mzk1Nn0.Jq1ek02FHiTOx9m8hQzX9Gh8bmOMzWSJ2YtJIzKg3ZQ'
+                    },
+                    body: JSON.stringify({
+                        user_id_input: 'nandlal',
+                        password_input: 'password123'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = '<div class="success">✅ Client login successful! Token: ' + data.token.substring(0, 20) + '...</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="error">❌ Client login failed: ' + data.error + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">❌ Error: ' + error.message + '</div>';
+            }
+        }
+
+        async function testAdminLogin() {
+            const resultDiv = document.getElementById('admin-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('https://vvpamvhqdyanomqvtmiz.supabase.co/rest/v1/rpc/authenticate_admin', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cGFtdmhxZHlhbm9tcXZ0bWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2Njc5NTYsImV4cCI6MjA2ODI0Mzk1Nn0.Jq1ek02FHiTOx9m8hQzX9Gh8bmOMzWSJ2YtJIzKg3ZQ'
+                    },
+                    body: JSON.stringify({
+                        email_input: 'admin@whatsapp-hub.com',
+                        password_input: 'admin123'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = '<div class="success">✅ Admin login successful! Token: ' + data.token.substring(0, 20) + '...</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="error">❌ Admin login failed: ' + data.error + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">❌ Error: ' + error.message + '</div>';
+            }
+        }
+
+        async function testProxyServer() {
+            const resultDiv = document.getElementById('proxy-result');
+            resultDiv.innerHTML = 'Testing...';
+            
+            try {
+                const response = await fetch('http://localhost:3001/api/fetch-media', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        userId: 'nandlal',
+                        apiKey: '6c690e3ce94a97dd3bc5349d215f293bae88963c'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = '<div class="success">✅ Proxy server is running! Response: ' + JSON.stringify(data).substring(0, 100) + '...</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="error">❌ Proxy server error: ' + response.status + '</div>';
+                }
+            } catch (error) {
+                resultDiv.innerHTML = '<div class="error">❌ Proxy server not accessible: ' + error.message + '</div>';
+            }
+        }
+    </script>
+</body>
+</html>

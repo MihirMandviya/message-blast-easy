@@ -112,6 +112,10 @@ export const useTemplates = () => {
         console.log('Returning templates data:', data.templates);
         return data.templates;
       } else {
+        // Check if it's an invalid credentials error
+        if (data.error && data.error.includes('Invalid credentials')) {
+          throw new Error('Invalid API credentials. Please contact your administrator to update your WhatsApp Business API credentials.');
+        }
         throw new Error(data.error || 'Failed to fetch templates');
       }
     } catch (error) {

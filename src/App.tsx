@@ -41,7 +41,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/auth" element={<Auth />} />
-              <Route path="/admin-auth" element={<AdminAuth />} />
+              <Route path="/admin-auth" element={<Auth />} />
               
               {/* Client routes */}
               <Route path="/" element={
