@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 async function testMediaWithLogging() {
   try {
     console.log('\n🔍 Testing Media API with detailed logging...');
-    const response = await fetch('http://localhost:3001/api/fetch-media', {
+    const response = await fetch('/api/fetch-media', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -25,7 +25,7 @@ async function testMediaWithLogging() {
 async function testTemplatesWithLogging() {
   try {
     console.log('\n🔍 Testing Templates API with detailed logging...');
-    const response = await fetch('http://localhost:3001/api/fetch-templates', {
+    const response = await fetch('/api/fetch-templates', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

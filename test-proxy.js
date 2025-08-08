@@ -7,7 +7,7 @@ async function testProxyServer() {
   try {
     // Test 1: Check if proxy server is reachable
     console.log('1. Testing proxy server connectivity...');
-    const response = await fetch('http://localhost:3001/api/fetch-templates', {
+    const response = await fetch('/api/fetch-templates', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

@@ -119,7 +119,7 @@
             resultDiv.innerHTML = 'Testing...';
             
             try {
-                const response = await fetch('http://localhost:3001/api/fetch-media', {
+                const response = await fetch('/api/fetch-media', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

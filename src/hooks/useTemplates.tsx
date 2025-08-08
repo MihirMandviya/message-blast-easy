@@ -93,7 +93,7 @@ export const useTemplates = () => {
       // Use proxy server to bypass CORS
       console.log('Making templates API call through proxy');
       
-      const response = await fetch('http://localhost:3001/api/fetch-templates', {
+      const response = await fetch('/api/fetch-templates', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

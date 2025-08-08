@@ -85,7 +85,7 @@ export const useMedia = () => {
       // Use proxy server to bypass CORS
       console.log('Making media API call through proxy');
       
-      const response = await fetch('http://localhost:3001/api/fetch-media', {
+      const response = await fetch('/api/fetch-media', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
