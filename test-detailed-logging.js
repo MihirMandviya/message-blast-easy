@@ -9,7 +9,7 @@ async function testMediaWithLogging() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        userId: 'nandlal',
+        userId: 'nandlalwa',
         apiKey: '6c690e3ce94a97dd3bc5349d215f293bae88963c'
       })
     });
@@ -31,7 +31,7 @@ async function testTemplatesWithLogging() {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        userId: 'nandlal',
+        userId: 'nandlalwa',
         password: 'Nandlal@12',
         wabaNumber: '919370853371'
       })

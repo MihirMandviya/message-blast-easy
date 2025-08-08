@@ -82,25 +82,28 @@ app.post('/api/fetch-media', async (req, res) => {
 // Proxy endpoint for templates API
 app.post('/api/fetch-templates', async (req, res) => {
   try {
-    const { userId, password, wabaNumber } = req.body;
+    const { userId, apiKey, wabaNumber } = req.body;
 
-    if (!userId || !password || !wabaNumber) {
-      return res.status(400).json({ error: 'Missing userId, password, or wabaNumber' });
+    if (!userId || !apiKey || !wabaNumber) {
+      return res.status(400).json({ error: 'Missing userId, apiKey, or wabaNumber' });
     }
 
     logToFile('=== TEMPLATES API REQUEST DETAILS ===');
     logToFile(`User ID: ${userId}`);
-    logToFile(`Password: ${password}`);
+    logToFile(`API Key: ${apiKey ? '***' + apiKey.slice(-4) : 'NOT_SET'}`);
     logToFile(`WhatsApp Number: ${wabaNumber}`);
-    logToFile(`Full URL: https://theultimate.io/WAApi/template?userid=${userId}&password=${password}&wabaNumber=${wabaNumber}&output=json`);
+    logToFile(`Full URL: https://theultimate.io/WAApi/template?userid=${userId}&wabaNumber=${wabaNumber}&output=json`);
     logToFile(`Request Headers: ${JSON.stringify({
+      'apiKey': apiKey ? '***' + apiKey.slice(-4) : 'NOT_SET',
       'Cookie': 'SERVERID=webC1'
     }, null, 2)}`);
     logToFile('====================================');
 
-    const response = await fetch(`https://theultimate.io/WAApi/template?userid=${userId}&password=${password}&wabaNumber=${wabaNumber}&output=json`, {
+    // Use API key approach (which we confirmed works)
+    const response = await fetch(`https://theultimate.io/WAApi/template?userid=${userId}&wabaNumber=${wabaNumber}&output=json`, {
       method: 'GET',
       headers: {
+        'apiKey': apiKey,
         'Cookie': 'SERVERID=webC1'
       }
     });

@@ -51,28 +51,32 @@ export const useTemplates = () => {
   const fetchTemplatesFromAPI = useCallback(async () => {
     console.log('Client data for templates:', client);
     console.log('User ID:', client?.user_id);
-    console.log('Password:', client?.password ? 'Present' : 'Missing');
+    console.log('WhatsApp API Key:', client?.whatsapp_api_key ? 'Present' : 'Missing');
     console.log('WhatsApp Number:', client?.whatsapp_number);
     
     // If user_id is not available, try to get it from the database
     let userId = client?.user_id;
-    let password = client?.password;
+    let apiKey = client?.whatsapp_api_key;
     let wabaNumber = client?.whatsapp_number;
     
-    if (!userId || !password || !wabaNumber) {
+    if (!userId || !apiKey || !wabaNumber) {
       if (client?.id) {
         try {
           const { data, error } = await supabase
             .from('client_users')
-            .select('user_id, password, whatsapp_number')
+            .select('user_id, whatsapp_api_key, whatsapp_number')
             .eq('id', client.id)
             .single();
           
           if (!error && data) {
             userId = data.user_id;
-            password = data.password;
+            apiKey = data.whatsapp_api_key;
             wabaNumber = data.whatsapp_number;
-            console.log('Retrieved credentials from database:', { userId, password: password ? 'Present' : 'Missing', wabaNumber });
+            console.log('Retrieved credentials from database:', { 
+              userId, 
+              apiKey: apiKey ? 'Present' : 'Missing', 
+              wabaNumber 
+            });
           }
         } catch (error) {
           console.error('Error fetching credentials:', error);
@@ -80,8 +84,8 @@ export const useTemplates = () => {
       }
     }
     
-    if (!userId || !password || !wabaNumber) {
-      setError(`API credentials not available. User ID: ${!!userId}, Password: ${!!password}, WABA Number: ${!!wabaNumber}`);
+    if (!userId || !apiKey || !wabaNumber) {
+      setError(`API credentials not available. User ID: ${!!userId}, API Key: ${!!apiKey}, WABA Number: ${!!wabaNumber}`);
       return null;
     }
 
@@ -96,7 +100,7 @@ export const useTemplates = () => {
         },
         body: JSON.stringify({
           userId: userId,
-          password: password,
+          apiKey: apiKey,
           wabaNumber: wabaNumber
         })
       });
@@ -122,7 +126,7 @@ export const useTemplates = () => {
       console.error('Error fetching templates from API:', error);
       throw error;
     }
-  }, [client?.user_id, client?.password, client?.whatsapp_number]);
+  }, [client?.user_id, client?.whatsapp_api_key, client?.whatsapp_number]);
 
   const syncTemplatesWithDatabase = useCallback(async () => {
     if (!client) return;
@@ -217,7 +221,7 @@ export const useTemplates = () => {
         id: client.id,
         email: client.email,
         user_id: client.user_id || 'Missing',
-        password: client.password ? 'Present' : 'Missing',
+        whatsapp_api_key: client.whatsapp_api_key ? 'Present' : 'Missing',
         whatsapp_number: client.whatsapp_number || 'Missing'
       });
     }
