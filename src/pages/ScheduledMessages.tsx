@@ -69,7 +69,7 @@ const ScheduledMessages = () => {
       const { data, error } = await supabase
         .from('scheduled_messages')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('client_id', user.id)
         .order('scheduled_for', { ascending: true });
 
       if (error) throw error;

@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useClientAuth } from '@/hooks/useClientAuth';
 
 interface ProtectedRouteProps {
@@ -8,7 +8,11 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { isAuthenticated, isLoading } = useClientAuth();
+  const location = useLocation();
 
+  // Check if this is an admin route being accessed by a client
+  const isAdminRoute = location.pathname.startsWith('/admin') || location.pathname === '/users';
+  
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -19,6 +23,11 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // If a client tries to access admin routes, redirect to client dashboard
+  if (isAdminRoute) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

@@ -111,7 +111,7 @@ const TemplateManagement: React.FC = () => {
     await syncTemplatesWithDatabase();
   };
 
-  const handleDeleteTemplate = async (template: any) => {
+  const handleDeleteTemplate = async (template) => {
     if (!client) {
       toast.error('Client data not available');
       return;
@@ -122,29 +122,34 @@ const TemplateManagement: React.FC = () => {
     }
 
     try {
-      // Get password from database if not in session
-      let password = session?.password;
-      if (!password) {
-        console.log('🔍 Password not in session, fetching from database...');
-        const { data: clientData, error } = await supabase
-          .from('client_users')
-          .select('password')
-          .eq('id', client.id)
-          .single();
-        
-        if (error || !clientData) {
-          toast.error('Failed to get client credentials');
-          return;
-        }
-        
-        // Get the actual password from the database
-        password = clientData.password;
-        console.log('🔍 Using password from database');
+      // Always fetch password from database to ensure we get the correct password field
+      console.log('🔍 Fetching password from database...');
+      const { data: clientData, error } = await supabase
+        .from('client_users')
+        .select('password')
+        .eq('id', client.id)
+        .single();
+      
+      if (error || !clientData) {
+        toast.error('Failed to get client credentials');
+        return;
+      }
+      
+      // Get the actual password from the database
+      const password = clientData.password;
+      console.log('🔍 Using password from database');
+
+      // Get the correct user_id - try different possible fields
+      const userId = client.user_id || client.id || client.user_id_string;
+      
+      if (!userId) {
+        toast.error('User ID not found in client data');
+        return;
       }
 
       // Debug: Log the client data being sent
       console.log('🔍 Delete template request data:', {
-        userId: client.user_id,
+        userId: userId,
         password: password ? '***' + password.slice(-4) : 'NOT_SET',
         wabaNumber: client.whatsapp_number,
         templateName: template.template_name,
@@ -157,7 +162,7 @@ const TemplateManagement: React.FC = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId: client.user_id,
+          userId: userId,
           password: password,
           wabaNumber: client.whatsapp_number,
           templateName: template.template_name,
@@ -195,24 +200,29 @@ const TemplateManagement: React.FC = () => {
     }
 
     try {
-      // Get password from database if not in session
-      let password = session?.password;
-      if (!password) {
-        console.log('🔍 Password not in session, fetching from database...');
-        const { data: clientData, error } = await supabase
-          .from('client_users')
-          .select('password')
-          .eq('id', client.id)
-          .single();
-        
-        if (error || !clientData) {
-          toast.error('Failed to get client credentials');
-          return;
-        }
-        
-        // Get the actual password from the database
-        password = clientData.password;
-        console.log('🔍 Using password from database');
+      // Always fetch password from database to ensure we get the correct password field
+      console.log('🔍 Fetching password from database...');
+      const { data: clientData, error } = await supabase
+        .from('client_users')
+        .select('password')
+        .eq('id', client.id)
+        .single();
+      
+      if (error || !clientData) {
+        toast.error('Failed to get client credentials');
+        return;
+      }
+      
+      // Get the actual password from the database
+      const password = clientData.password;
+      console.log('🔍 Using password from database');
+
+      // Get the correct user_id - try different possible fields
+      const userId = client.user_id || client.id || client.user_id_string;
+      
+      if (!userId) {
+        toast.error('User ID not found in client data');
+        return;
       }
 
       let deletedCount = 0;
@@ -226,8 +236,8 @@ const TemplateManagement: React.FC = () => {
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              userId: client.user_id,
-              password: password || '',
+              userId: userId,
+              password: password,
               wabaNumber: client.whatsapp_number,
               templateName: template.template_name,
               language: template.language

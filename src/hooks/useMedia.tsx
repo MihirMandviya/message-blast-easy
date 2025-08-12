@@ -131,16 +131,39 @@ export const useMedia = () => {
       console.log('API Media received:', apiMedia);
       if (!apiMedia) return;
 
+      // Get the client_id (from clients table) for this user
+      let clientOrgId = client.id;
+      try {
+        // First try to get the client_id from the client_users table
+        const { data: clientData, error: clientError } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('id', client.id)
+          .single();
+        
+        if (!clientError && clientData?.client_id) {
+          clientOrgId = clientData.client_id;
+          console.log('Retrieved client_id from database:', clientOrgId);
+        } else {
+          console.error('Could not find client organization ID');
+          throw new Error('Could not find client organization ID');
+        }
+      } catch (error) {
+        console.error('Error fetching client_id:', error);
+        throw error;
+      }
+
       // Clear all existing media for this user first
       await supabase
         .from('media')
         .delete()
-        .eq('user_id', client.id);
+        .eq('client_id', client.id);
 
       // Prepare media data with unique names to avoid conflicts
       const mediaToInsert = apiMedia.map((item, index) => ({
-        user_id: client.id,
-        client_id: client.id,
+        user_id: clientOrgId, // Use the organization/client ID
+        client_id: client.id, // Use the current client_user ID
+        added_by: client.id, // Set added_by to the current client user
         name: item.identifier,
         creation_time: item.creationTime,
         description: item.description,
@@ -176,10 +199,32 @@ export const useMedia = () => {
     if (!client) return;
 
     try {
+      // Get the client_id (from clients table) for this user
+      let clientOrgId = client.id;
+      try {
+        // First try to get the client_id from the client_users table
+        const { data: clientData, error: clientError } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('id', client.id)
+          .single();
+        
+        if (!clientError && clientData?.client_id) {
+          clientOrgId = clientData.client_id;
+          console.log('Retrieved client_id from database for query:', clientOrgId);
+        } else {
+          console.error('Could not find client organization ID');
+          throw new Error('Could not find client organization ID');
+        }
+      } catch (error) {
+        console.error('Error fetching client_id for query:', error);
+        throw error;
+      }
+
       const { data, error } = await supabase
         .from('media')
         .select('*')
-        .eq('user_id', client.id)
+        .eq('user_id', clientOrgId) // Query by user_id (organization ID)
         .order('created_at', { ascending: false });
 
       if (error) {

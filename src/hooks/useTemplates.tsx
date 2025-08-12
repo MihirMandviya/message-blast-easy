@@ -140,16 +140,39 @@ export const useTemplates = () => {
       console.log('API Templates received:', apiTemplates);
       if (!apiTemplates) return;
 
+      // Get the client_id (from clients table) for this user
+      let clientOrgId = client.id;
+      try {
+        // First try to get the client_id from the client_users table
+        const { data: clientData, error: clientError } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('id', client.id)
+          .single();
+        
+        if (!clientError && clientData?.client_id) {
+          clientOrgId = clientData.client_id;
+          console.log('Retrieved client_id from database for templates:', clientOrgId);
+        } else {
+          console.error('Could not find client organization ID');
+          throw new Error('Could not find client organization ID');
+        }
+      } catch (error) {
+        console.error('Error fetching client_id for templates:', error);
+        throw error;
+      }
+
       // Clear existing templates for this user
       await supabase
         .from('templates')
         .delete()
-        .eq('user_id', client.id);
+        .eq('user_id', clientOrgId);
 
       // Insert new templates data
       const templatesToInsert = apiTemplates.map((item: TemplateItem) => ({
-        user_id: client.id,
-        client_id: client.id,
+        user_id: clientOrgId, // Use the organization/client ID
+        client_id: client.id, // Use the current client_user ID
+        added_by: client.id, // Set added_by to the current client user
         template_name: item.templateName,
         creation_time: item.creationTime,
         whatsapp_status: item.whatsAppStatus,
@@ -188,10 +211,32 @@ export const useTemplates = () => {
     if (!client) return;
 
     try {
+      // Get the client_id (from clients table) for this user
+      let clientOrgId = client.id;
+      try {
+        // First try to get the client_id from the client_users table
+        const { data: clientData, error: clientError } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('id', client.id)
+          .single();
+        
+        if (!clientError && clientData?.client_id) {
+          clientOrgId = clientData.client_id;
+          console.log('Retrieved client_id from database for template query:', clientOrgId);
+        } else {
+          console.error('Could not find client organization ID');
+          throw new Error('Could not find client organization ID');
+        }
+      } catch (error) {
+        console.error('Error fetching client_id for template query:', error);
+        throw error;
+      }
+
       const { data, error } = await supabase
         .from('templates')
         .select('*')
-        .eq('user_id', client.id)
+        .eq('user_id', clientOrgId) // Query by user_id (organization ID)
         .order('created_at', { ascending: false });
 
       if (error) {

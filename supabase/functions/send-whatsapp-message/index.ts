@@ -48,10 +48,11 @@ serve(async (req) => {
     console.log('Token length:', token.length);
     console.log('Token preview:', token.substring(0, 10) + '...');
     
-    // Validate client session
+    // Validate client session with improved error handling
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('client_sessions')
       .select(`
+        id,
         client_id,
         expires_at,
         client_users!inner(
@@ -68,7 +69,11 @@ serve(async (req) => {
       .gt('expires_at', new Date().toISOString())
       .maybeSingle();
 
-    console.log('Session query result:', { sessionData, sessionError });
+    console.log('Session query result:', { 
+      sessionFound: !!sessionData, 
+      sessionError: sessionError?.message,
+      expiresAt: sessionData?.expires_at 
+    });
 
     if (sessionError) {
       console.error('Session validation error:', sessionError);
@@ -82,7 +87,7 @@ serve(async (req) => {
     }
 
     if (!sessionData) {
-      console.error('No session found for token');
+      console.error('No valid session found for token');
       return new Response(JSON.stringify({
         success: false,
         error: 'Invalid or expired session'

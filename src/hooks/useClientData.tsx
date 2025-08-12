@@ -43,23 +43,23 @@ export const useClientData = () => {
               description
             )
           `)
-          .eq('user_id', client.id)
+          .eq('client_id', client.id)
           .order('created_at', { ascending: false }),
         supabase
           .from('templates')
           .select('*')
-          .eq('user_id', client.id)
+          .eq('client_id', client.id)
           .order('created_at', { ascending: false }),
         supabase
           .from('messages')
           .select('*')
-          .eq('user_id', client.id)
+          .eq('client_id', client.id)
           .order('created_at', { ascending: false })
           .limit(100),
         supabase
           .from('campaigns')
           .select('*')
-          .eq('user_id', client.id)
+          .eq('client_id', client.id)
           .order('created_at', { ascending: false })
       ]);
 
@@ -184,7 +184,7 @@ export const useClientData = () => {
         .from('contacts')
         .update(updates)
         .eq('id', id)
-        .eq('user_id', client.id)
+        .eq('client_id', client.id)
         .select(`
           *,
           groups(
@@ -223,7 +223,7 @@ export const useClientData = () => {
         .from('contacts')
         .delete()
         .eq('id', id)
-        .eq('user_id', client.id);
+        .eq('client_id', client.id);
 
       if (error) throw error;
 
@@ -242,9 +242,36 @@ export const useClientData = () => {
     if (!client) return { error: 'Not authenticated' };
 
     try {
+      // Get the client_id (from clients table) for this user
+      let clientOrgId = client.id;
+      try {
+        // First try to get the client_id from the client_users table
+        const { data: clientData, error: clientError } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('id', client.id)
+          .single();
+        
+        if (!clientError && clientData?.client_id) {
+          clientOrgId = clientData.client_id;
+          console.log('Retrieved client_id from database for addTemplate:', clientOrgId);
+        } else {
+          console.error('Could not find client organization ID');
+          throw new Error('Could not find client organization ID');
+        }
+      } catch (error) {
+        console.error('Error fetching client_id for addTemplate:', error);
+        throw error;
+      }
+
       const { data: newTemplate, error } = await supabase
         .from('templates')
-        .insert([{ ...templateData, user_id: client.id }])
+        .insert([{ 
+          ...templateData, 
+          user_id: clientOrgId, // Use the organization/client ID
+          client_id: client.id, // Use the current client_user ID
+          added_by: client.id // Set added_by to the current client user
+        }])
         .select()
         .single();
 
@@ -284,7 +311,7 @@ export const useClientData = () => {
         .from('templates')
         .update(updates)
         .eq('id', id)
-        .eq('user_id', client.id)
+        .eq('client_id', client.id)
         .select()
         .single();
 
@@ -324,7 +351,7 @@ export const useClientData = () => {
         .from('templates')
         .delete()
         .eq('id', id)
-        .eq('user_id', client.id);
+        .eq('client_id', client.id);
 
       if (error) throw error;
 

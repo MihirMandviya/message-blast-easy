@@ -40,7 +40,7 @@ const MessageHistory = () => {
       const { data, error } = await supabase
         .from('messages')
         .select('*')
-        .eq('user_id', client.id)
+        .eq('client_id', client.id)
         .order('created_at', { ascending: false });
 
       if (error) {

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Users, MessageSquare, Target, Calendar, Send, Eye, Edit, Trash2, RotateCcw, RefreshCw, Clock, Bug, AlertTriangle } from "lucide-react";
+import { Plus, Users, MessageSquare, Target, Calendar, Send, Eye, Edit, Trash2, RotateCcw, RefreshCw, Clock, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useClientAuth } from "@/hooks/useClientAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,7 +81,7 @@ export default function Campaigns() {
   const [overdueCampaigns, setOverdueCampaigns] = useState<number>(0);
 
   const { toast } = useToast();
-  const { client } = useClientAuth();
+  const { client, session: clientSession } = useClientAuth();
 
   // Function to check if campaign can be retried/resent
   const canRetryCampaign = (campaign: Campaign) => {
@@ -275,7 +275,7 @@ export default function Campaigns() {
 
   const handleCreateCampaign = async () => {
     try {
-      console.log('=== CAMPAIGN CREATION DEBUG START ===');
+  
       console.log('Form data:', JSON.stringify(formData, null, 2));
       console.log('Client ID:', client?.id);
       console.log('Selected template:', selectedTemplate);
@@ -425,14 +425,37 @@ export default function Campaigns() {
         campaignStatus = 'draft';
       }
 
+      // Get the client_id (from clients table) for this user
+      let clientOrgId = client?.id;
+      try {
+        // First try to get the client_id from the client_users table
+        const { data: clientData, error: clientError } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('id', client?.id)
+          .single();
+        
+        if (!clientError && clientData?.client_id) {
+          clientOrgId = clientData.client_id;
+          console.log('Retrieved client_id from database for campaign:', clientOrgId);
+        } else {
+          console.error('Could not find client organization ID');
+          throw new Error('Could not find client organization ID');
+        }
+      } catch (error) {
+        console.error('Error fetching client_id for campaign:', error);
+        throw error;
+      }
+
       const campaignData = {
         name: formData.name,
         description: formData.description,
         message_content: selectedTemplate ? getTemplateContent(selectedTemplate) : '',
         message_type: 'text',
-        target_groups: [formData.group_id],
-        user_id: client?.id,
-        client_id: client?.id, // Add client_id for RLS policies
+        target_groups: [formData.group_id], // This will be converted to UUID array by Supabase
+        user_id: clientOrgId, // Use the organization/client ID
+        client_id: client?.id, // Use the current client_user ID
+        added_by: client?.id, // Set added_by to the current client user
         group_id: formData.group_id,
         template_id: formData.template_id,
         status: campaignStatus,
@@ -535,7 +558,7 @@ export default function Campaigns() {
       setSelectedTemplate(null);
       setSelectedGroup(null);
       loadData();
-      console.log('=== CAMPAIGN CREATION DEBUG END ===');
+      
     } catch (error: any) {
       console.error('=== CATCH BLOCK ERROR ===');
       console.error('Error creating campaign:', error);
@@ -697,7 +720,7 @@ export default function Campaigns() {
 
   const sendCampaign = async (campaignId: string) => {
     try {
-      console.log('=== SEND CAMPAIGN DEBUG START ===');
+  
       console.log('Campaign ID:', campaignId);
       console.log('sendCampaign function called at:', new Date().toISOString());
 
@@ -1008,7 +1031,7 @@ export default function Campaigns() {
         description: `Failed to send campaign: ${errorMessage}`,
         variant: "destructive",
       });
-      console.log('=== SEND CAMPAIGN DEBUG END ===');
+      
     }
   };
 
@@ -1421,99 +1444,9 @@ export default function Campaigns() {
     }
   };
 
-  // Debug function to test database access
-  const debugDatabaseAccess = async () => {
-    try {
-      console.log('=== DATABASE ACCESS DEBUG ===');
-      console.log('Client ID:', client?.id);
-
-      // Test basic connection
-      const { data: testData, error: testError, count } = await supabase
-        .from('campaigns')
-        .select('count', { count: 'exact' })
-        .limit(1);
-
-      console.log('Basic connection test:', { data: testData, error: testError, count });
-
-      // Test client access
-      if (client?.id) {
-        const { data: clientCampaigns, error: clientError } = await supabase
-          .from('campaigns')
-          .select('id, name')
-          .eq('client_id', client.id)
-          .limit(5);
-
-        console.log('Client campaigns test:', { data: clientCampaigns, error: clientError });
-
-        // Test groups access
-        const { data: clientGroups, error: groupsError } = await supabase
-          .from('groups')
-          .select('id, name')
-          .eq('client_id', client.id)
-          .limit(5);
-
-        console.log('Client groups test:', { data: clientGroups, error: groupsError });
-
-        // Test templates access
-        const { data: clientTemplates, error: templatesError } = await supabase
-          .from('templates')
-          .select('id, template_name')
-          .eq('client_id', client.id)
-          .limit(5);
-
-        console.log('Client templates test:', { data: clientTemplates, error: templatesError });
-
-        // Test contacts access
-        const { data: clientContacts, error: contactsError } = await supabase
-          .from('contacts')
-          .select('id, name, phone')
-          .eq('client_id', client.id)
-          .limit(5);
-
-        console.log('Client contacts test:', { data: clientContacts, error: contactsError });
-
-        // Test contact_groups access for a specific group
-        if (clientGroups && clientGroups.length > 0) {
-          const groupId = clientGroups[0].id;
-          console.log('Testing contact_groups for group:', groupId);
-          
-          const { data: testContactGroups, error: contactGroupsError } = await supabase
-            .from('contact_groups')
-            .select(`
-              *,
-              contacts(*)
-            `)
-            .eq('group_id', groupId);
-          
-          console.log('Test contact_groups query:', { 
-            data: testContactGroups, 
-            error: contactGroupsError,
-            count: testContactGroups?.length || 0
-          });
-          
-          if (testContactGroups && testContactGroups.length > 0) {
-            console.log('Contact groups details:', testContactGroups.map(cg => ({
-              contact_id: cg.contact_id,
-              group_id: cg.group_id,
-              contact_name: cg.contacts?.name,
-              contact_phone: cg.contacts?.phone
-            })));
-          } else {
-            console.log('No contact_groups found for this group. This explains why campaigns fail.');
-            console.log('You need to add contacts to groups before creating campaigns.');
-          }
-        }
-      }
-
-      console.log('=== DATABASE ACCESS DEBUG END ===');
-    } catch (error) {
-      console.error('Debug function error:', error);
-    }
-  };
-
   const processSendingCampaigns = async () => {
     try {
-      console.log('=== PROCESSING SENDING CAMPAIGNS ===');
+
 
       // Find campaigns with "sending" status
       const { data: sendingCampaigns, error } = await supabase
@@ -1626,83 +1559,6 @@ export default function Campaigns() {
           <p className="text-muted-foreground">Create and manage your WhatsApp campaigns</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={async () => {
-              console.log('=== TEST API REQUEST ===');
-              console.log('Testing edge function API call...');
-              
-              // Get client session from localStorage
-              const storedSession = localStorage.getItem('client_session');
-              const clientSession = storedSession ? JSON.parse(storedSession) : null;
-              const clientToken = clientSession?.token;
-
-              if (!clientToken) {
-                toast({
-                  title: "Authentication Error",
-                  description: "Please log in again to test API",
-                  variant: "destructive",
-                });
-                return;
-              }
-
-              try {
-                const requestBody = {
-                  recipient_phone: '+1234567890',
-                  message_content: 'Test message from campaign debug',
-                  message_type: 'text',
-                  template_name: 'test_template',
-                  campaign_id: 'test-campaign'
-                };
-
-                console.log('Test request body:', requestBody);
-
-                const response = await fetch(`${supabase.supabaseUrl}/functions/v1/send-whatsapp-message`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${clientToken}`,
-                  },
-                  body: JSON.stringify(requestBody)
-                });
-
-                console.log('Test API Response Status:', response.status);
-                const result = await response.text();
-                console.log('Test API Response Body:', result);
-
-                try {
-                  const parsedResult = JSON.parse(result);
-                  if (parsedResult.success) {
-                    toast({
-                      title: "API Test Success",
-                      description: "Edge function is working correctly",
-                    });
-                  } else {
-                    toast({
-                      title: "API Test Failed",
-                      description: parsedResult.error || "Unknown error",
-                      variant: "destructive",
-                    });
-                  }
-                } catch (parseError) {
-                  toast({
-                    title: "API Test Response",
-                    description: "Raw response: " + result,
-                  });
-                }
-              } catch (error) {
-                console.log('Test API Error:', error);
-                toast({
-                  title: "API Test Error",
-                  description: error.message,
-                  variant: "destructive",
-                });
-              }
-            }}
-            className="flex items-center gap-2"
-          >
-            Test API
-          </Button>
           <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
             Create Campaign
@@ -1715,15 +1571,6 @@ export default function Campaigns() {
           >
             <Send className="h-4 w-4" />
             Process Sending
-          </Button>
-          <Button
-            onClick={debugDatabaseAccess}
-            variant="outline"
-            className="flex items-center gap-2"
-            title="Debug database access"
-          >
-            <Bug className="h-4 w-4" />
-            Debug
           </Button>
         </div>
       </div>

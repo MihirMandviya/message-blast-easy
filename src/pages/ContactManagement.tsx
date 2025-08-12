@@ -60,6 +60,9 @@ const ContactManagement = () => {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvContent, setCsvContent] = useState('');
   const [importing, setImporting] = useState(false);
+  const [showCreateListOption, setShowCreateListOption] = useState(false);
+  const [newListForImport, setNewListForImport] = useState({ name: '', description: '' });
+  const [creatingListForImport, setCreatingListForImport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [newContact, setNewContact] = useState({
@@ -359,6 +362,47 @@ const ContactManagement = () => {
     reader.readAsText(file);
   };
 
+  const handleCreateListForImport = async () => {
+    if (!client || !newListForImport.name.trim()) return;
+
+    setCreatingListForImport(true);
+    try {
+      const { data, error } = await supabase
+        .from('groups')
+        .insert([{
+          name: newListForImport.name.trim(),
+          description: newListForImport.description.trim() || null,
+          user_id: client.id,
+          client_id: client.id
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Set the newly created group as selected
+      setNewContact({ ...newContact, groupId: data.id });
+      setShowCreateListOption(false);
+      setNewListForImport({ name: '', description: '' });
+      
+      // Refresh groups list
+      await loadGroups();
+
+      toast({
+        title: "Success",
+        description: "List created successfully",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to create list: " + error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingListForImport(false);
+    }
+  };
+
   const handleImportCSV = async () => {
     if (!client || !csvContent.trim()) return;
 
@@ -389,6 +433,9 @@ const ContactManagement = () => {
 
       setCsvContent('');
       setCsvFile(null);
+      setNewContact({ ...newContact, groupId: '' });
+      setShowCreateListOption(false);
+      setNewListForImport({ name: '', description: '' });
       setIsImportDialogOpen(false);
       refreshData();
     } catch (error: any) {
@@ -905,7 +952,18 @@ const ContactManagement = () => {
       </Tabs>
 
       {/* Import CSV Dialog */}
-      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+      <Dialog open={isImportDialogOpen} onOpenChange={(open) => {
+        setIsImportDialogOpen(open);
+        if (!open) {
+          // Reset all import-related state when dialog is closed
+          setCsvFile(null);
+          setCsvContent('');
+          setNewContact({ ...newContact, groupId: '' });
+          setShowCreateListOption(false);
+          setNewListForImport({ name: '', description: '' });
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Import Contacts from CSV</DialogTitle>
@@ -962,18 +1020,82 @@ const ContactManagement = () => {
 
             <div>
               <Label htmlFor="import-group">List *</Label>
-              <Select value={newContact.groupId} onValueChange={(value) => setNewContact({ ...newContact, groupId: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a list (required)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {groups.map(group => (
-                    <SelectItem key={group.id} value={group.id}>
-                      {group.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-3">
+                <Select value={newContact.groupId} onValueChange={(value) => setNewContact({ ...newContact, groupId: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a list (required)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {groups.map(group => (
+                      <SelectItem key={group.id} value={group.id}>
+                        {group.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground px-2">OR</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowCreateListOption(!showCreateListOption)}
+                  className="w-full"
+                >
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  Create New List
+                </Button>
+                
+                {showCreateListOption && (
+                  <div className="space-y-3 p-4 border rounded-lg bg-muted/50">
+                    <div>
+                      <Label htmlFor="new-list-name">List Name *</Label>
+                      <Input
+                        id="new-list-name"
+                        value={newListForImport.name}
+                        onChange={(e) => setNewListForImport({ ...newListForImport, name: e.target.value })}
+                        placeholder="Enter list name"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="new-list-description">Description (Optional)</Label>
+                      <Textarea
+                        id="new-list-description"
+                        value={newListForImport.description}
+                        onChange={(e) => setNewListForImport({ ...newListForImport, description: e.target.value })}
+                        placeholder="Enter list description"
+                        className="mt-1"
+                        rows={2}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        onClick={handleCreateListForImport}
+                        disabled={!newListForImport.name.trim() || creatingListForImport}
+                        className="flex-1"
+                      >
+                        {creatingListForImport ? 'Creating...' : 'Create List'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowCreateListOption(false);
+                          setNewListForImport({ name: '', description: '' });
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <p className="text-sm text-muted-foreground mt-1">
                 Every contact must belong to a list
               </p>

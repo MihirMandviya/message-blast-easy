@@ -4,11 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 interface ClientUser {
   id: string;
   email: string;
+  password: string;
   business_name: string;
   phone_number: string;
   whatsapp_api_key: string | null;
   whatsapp_number: string | null;
-  user_id: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -16,6 +16,13 @@ interface ClientUser {
   is_active: boolean;
   subscription_plan: string;
   subscription_expires_at: string | null;
+  user_id: string | null;
+  organization_id: string | null;
+  role_id: string | null;
+  client_id: string | null;
+  mem_password: string | null;
+  is_primary_user: boolean | null;
+  name: string | null;
 }
 
 interface ClientSession {
@@ -32,6 +39,7 @@ interface ClientAuthContextType {
   signIn: (identifier: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
+  debugSession: () => void;
 }
 
 const ClientAuthContext = createContext<ClientAuthContextType | undefined>(undefined);
@@ -51,34 +59,60 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const initializeAuth = async () => {
+      // Clear admin session if client session exists (mutual exclusion)
+      const adminSession = localStorage.getItem('admin_session');
+      const clientSession = localStorage.getItem('client_session');
+      
+      if (clientSession && adminSession) {
+        // If both sessions exist, prefer client session and clear admin
+        localStorage.removeItem('admin_session');
+      }
+      
       // Check for existing session
-      const storedSession = localStorage.getItem('client_session');
-      if (storedSession) {
+      if (clientSession) {
         try {
-          const parsedSession = JSON.parse(storedSession) as ClientSession;
+          const parsedSession = JSON.parse(clientSession) as ClientSession;
           // Validate session is still valid
-          if (parsedSession.client && parsedSession.token) {
-            // Check if client data is missing user_id and refresh it
-            if (!parsedSession.client.user_id && parsedSession.client.id) {
-              try {
-                const { data, error } = await supabase
-                  .from('client_users')
-                  .select('*')
-                  .eq('id', parsedSession.client.id)
-                  .single();
-                
-                if (!error && data) {
-                  parsedSession.client = data;
-                  localStorage.setItem('client_session', JSON.stringify(parsedSession));
-                  console.log('Refreshed client session with complete data');
+          if (parsedSession.client && parsedSession.session_id) {
+            // Check if session exists in database and is still valid
+            try {
+              const { data: sessionData, error: sessionError } = await supabase
+                .from('client_sessions')
+                .select('*')
+                .eq('id', parsedSession.session_id)
+                .gt('expires_at', new Date().toISOString())
+                .single();
+              
+              if (!sessionError && sessionData) {
+                // Session is valid, update token and refresh client data
+                parsedSession.token = sessionData.token; // Use the token from database
+                try {
+                  const { data, error } = await supabase
+                    .from('client_users')
+                    .select('*')
+                    .eq('id', parsedSession.client.id)
+                    .single();
+                  
+                  if (!error && data) {
+                    parsedSession.client = data;
+                    localStorage.setItem('client_session', JSON.stringify(parsedSession));
+                    console.log('Refreshed client session with complete data and database token');
+                  }
+                } catch (error) {
+                  console.error('Error refreshing client data:', error);
                 }
-              } catch (error) {
-                console.error('Error refreshing client data:', error);
+                
+                setSession(parsedSession);
+                setClient(parsedSession.client);
+              } else {
+                // Session is invalid, remove it
+                console.log('Session expired or invalid, removing from localStorage');
+                localStorage.removeItem('client_session');
               }
+            } catch (error) {
+              console.error('Error validating session:', error);
+              localStorage.removeItem('client_session');
             }
-            
-            setSession(parsedSession);
-            setClient(parsedSession.client);
           } else {
             localStorage.removeItem('client_session');
           }
@@ -96,45 +130,80 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
   const signIn = async (identifier: string, password: string) => {
     setIsLoading(true);
     try {
-      // First try to authenticate with user_id
-      let { data, error } = await supabase.rpc('authenticate_client_by_user_id', {
-        user_id_input: identifier,
-        password_input: password
-      });
+      // Clear any existing admin session when client logs in
+      localStorage.removeItem('admin_session');
+      
+      // Authenticate client using email and mem_password from client_users table
+      const { data, error } = await supabase
+        .from('client_users')
+        .select('*')
+        .eq('email', identifier)
+        .eq('mem_password', password)
+        .eq('is_active', true)
+        .single();
 
-      // If that fails, try with email (backward compatibility)
-      if (error || !data || !data.success) {
-        const { data: emailData, error: emailError } = await supabase.rpc('authenticate_client', {
-          email_input: identifier,
-          password_input: password
-        });
-
-        if (emailError || !emailData || !emailData.success) {
-          setIsLoading(false);
-          return { error: 'Invalid User ID/Email or password' };
-        }
-
-        data = emailData;
+      if (error || !data) {
+        setIsLoading(false);
+        return { error: 'Invalid email or password' };
       }
 
-      const response = data as any;
-      if (response.success) {
-              const sessionData: ClientSession = {
-        client: response.client,
-        token: response.token,
-        session_id: response.session_id,
+      // Check for existing valid session first
+      const { data: existingSession, error: sessionCheckError } = await supabase
+        .from('client_sessions')
+        .select('*')
+        .eq('client_id', data.id)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      let token: string;
+      let session_id: string;
+
+      if (existingSession && !sessionCheckError) {
+        // Use existing session
+        token = existingSession.token;
+        session_id = existingSession.id;
+        console.log('Using existing session:', session_id);
+      } else {
+        // Create new session
+        token = crypto.randomUUID();
+        session_id = crypto.randomUUID();
+
+        // Create session record in database
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24); // 24 hour expiry
+
+        const { error: sessionError } = await supabase
+          .from('client_sessions')
+          .insert({
+            id: session_id,
+            client_id: data.id,
+            token: token,
+            expires_at: expiresAt.toISOString(),
+            created_at: new Date().toISOString()
+          });
+
+        if (sessionError) {
+          console.error('Error creating session:', sessionError);
+          setIsLoading(false);
+          return { error: 'Failed to create session' };
+        }
+        console.log('Created new session:', session_id);
+      }
+
+      const sessionData: ClientSession = {
+        client: data,
+        token,
+        session_id,
         password: password // Store password temporarily for API calls
       };
-        
-        setSession(sessionData);
-        setClient(response.client);
-        localStorage.setItem('client_session', JSON.stringify(sessionData));
-        setIsLoading(false);
-        return { error: null };
-      } else {
-        setIsLoading(false);
-        return { error: response.error || 'Authentication failed' };
-      }
+      
+      setSession(sessionData);
+      setClient(data);
+      localStorage.setItem('client_session', JSON.stringify(sessionData));
+      setIsLoading(false);
+      return { error: null };
     } catch (error) {
       setIsLoading(false);
       return { error: 'An unexpected error occurred' };
@@ -153,9 +222,26 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
     setClient(null);
     setSession(null);
     localStorage.removeItem('client_session');
+    // Also clear admin session to ensure clean state
+    localStorage.removeItem('admin_session');
   };
 
   const isAuthenticated = !!client && !!session;
+
+  // Debug function to log session info
+  const debugSession = () => {
+    if (session) {
+      console.log('=== SESSION DEBUG ===');
+      console.log('Session ID:', session.session_id);
+      console.log('Token length:', session.token?.length);
+      console.log('Token preview:', session.token ? session.token.substring(0, 20) + '...' : 'NO_TOKEN');
+      console.log('Client ID:', session.client?.id);
+      console.log('Client email:', session.client?.email);
+      console.log('=== END SESSION DEBUG ===');
+    } else {
+      console.log('No active session');
+    }
+  };
 
   return (
     <ClientAuthContext.Provider value={{
@@ -164,7 +250,8 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
       isLoading,
       signIn,
       signOut,
-      isAuthenticated
+      isAuthenticated,
+      debugSession
     }}>
       {children}
     </ClientAuthContext.Provider>

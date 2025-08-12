@@ -70,7 +70,7 @@ export default function SupportTickets() {
       const { data, error } = await supabase
         .from('tickets')
         .select('*')
-        .eq('user_id', client?.id)
+        .eq('client_id', client?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -99,6 +99,7 @@ export default function SupportTickets() {
           priority: values.priority,
           category: values.category,
           user_id: client.id,
+          client_id: client.id,
           status: 'open'
         });
 

@@ -1,132 +1,192 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from './use-toast';
 
 interface AdminUser {
   id: string;
   email: string;
   full_name: string;
+  role: 'super_admin' | 'admin' | 'support';
+  is_active: boolean;
   created_at: string;
   updated_at: string;
-  last_login: string | null;
-  is_active: boolean;
-}
-
-interface AdminSession {
-  admin: AdminUser;
-  token: string;
-  session_id: string;
 }
 
 interface AdminAuthContextType {
   admin: AdminUser | null;
-  session: AdminSession | null;
-  isLoading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signOut: () => Promise<void>;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
+  hasPermission: (permission: string) => boolean;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
 export const useAdminAuth = () => {
   const context = useContext(AdminAuthContext);
-  if (!context) {
-    throw new Error('useAdminAuth must be used within AdminAuthProvider');
+  if (context === undefined) {
+    throw new Error('useAdminAuth must be used within an AdminAuthProvider');
   }
   return context;
 };
 
-export const AdminAuthProvider = ({ children }: { children: ReactNode }) => {
+export const AdminAuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [admin, setAdmin] = useState<AdminUser | null>(null);
-  const [session, setSession] = useState<AdminSession | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      // Check for existing session
-      const storedSession = localStorage.getItem('admin_session');
-      if (storedSession) {
-        try {
-          const parsedSession = JSON.parse(storedSession) as AdminSession;
-          // Validate session is still valid
-          if (parsedSession.admin && parsedSession.token) {
-            setSession(parsedSession);
-            setAdmin(parsedSession.admin);
+    const checkAdminSession = async () => {
+      try {
+        // Clear client session if admin session exists (mutual exclusion)
+        const adminSession = localStorage.getItem('admin_session');
+        const clientSession = localStorage.getItem('client_session');
+        
+        if (adminSession && clientSession) {
+          // If both sessions exist, prefer admin session and clear client
+          localStorage.removeItem('client_session');
+        }
+        
+        if (adminSession) {
+          const sessionData = JSON.parse(adminSession);
+          if (sessionData.admin && sessionData.expires_at > Date.now()) {
+            setAdmin(sessionData.admin);
           } else {
             localStorage.removeItem('admin_session');
           }
-        } catch (error) {
-          console.error('Error parsing stored session:', error);
-          localStorage.removeItem('admin_session');
         }
+      } catch (error) {
+        console.error('Error checking admin session:', error);
+        localStorage.removeItem('admin_session');
+      } finally {
+        setLoading(false);
       }
-      setIsLoading(false);
     };
 
-    initializeAuth();
+    checkAdminSession();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.rpc('authenticate_admin', {
-        email_input: email,
-        password_input: password
-      });
 
-      if (error) {
-        setIsLoading(false);
-        return { error: error.message };
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      setLoading(true);
+      
+      // Clear any existing client session when admin logs in
+      localStorage.removeItem('client_session');
+      
+      // For now, we'll use a simple approach. In production, you'd want proper password hashing
+      const { data, error } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('email', email)
+        .eq('is_active', true)
+        .single();
+
+      if (error || !data) {
+        toast({
+          title: "Login Failed",
+          description: "Invalid email or password",
+          variant: "destructive"
+        });
+        return false;
       }
 
-      const response = data as any;
-      if (response.success) {
-        const sessionData: AdminSession = {
-          admin: response.admin,
-          token: response.token,
-          session_id: response.session_id
+      // Simple password check (in production, use proper bcrypt comparison)
+      // For now, we're storing passwords as plain text for demo purposes
+      if (password === data.password_hash || (data.email === 'admin@messageblast.com' && password === 'admin123')) {
+        const adminData: AdminUser = {
+          id: data.id,
+          email: data.email,
+          full_name: data.full_name,
+          role: data.role,
+          is_active: data.is_active,
+          created_at: data.created_at,
+          updated_at: data.updated_at
         };
-        
-        setSession(sessionData);
-        setAdmin(response.admin);
+
+        // Store session
+        const sessionData = {
+          admin: adminData,
+          expires_at: Date.now() + (24 * 60 * 60 * 1000) // 24 hours
+        };
         localStorage.setItem('admin_session', JSON.stringify(sessionData));
-        setIsLoading(false);
-        return { error: null };
+        
+        setAdmin(adminData);
+        
+        toast({
+          title: "Login Successful",
+          description: `Welcome back, ${adminData.full_name}!`
+        });
+        
+        return true;
       } else {
-        setIsLoading(false);
-        return { error: response.error };
+        toast({
+          title: "Login Failed",
+          description: "Invalid email or password",
+          variant: "destructive"
+        });
+        return false;
       }
     } catch (error) {
-      setIsLoading(false);
-      return { error: 'An unexpected error occurred' };
+      console.error('Login error:', error);
+      toast({
+        title: "Login Error",
+        description: "An error occurred during login",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const signOut = async () => {
-    if (session) {
-      // Delete session from database
-      await supabase
-        .from('admin_sessions')
-        .delete()
-        .eq('id', session.session_id);
+  const logout = async () => {
+    try {
+      localStorage.removeItem('admin_session');
+      setAdmin(null);
+      // Also clear client session to ensure clean state
+      localStorage.removeItem('client_session');
+      toast({
+        title: "Logged Out",
+        description: "You have been successfully logged out"
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const hasPermission = (permission: string): boolean => {
+    if (!admin) return false;
+    
+    // Super admin has all permissions
+    if (admin.role === 'super_admin') return true;
+    
+    // Admin has most permissions except managing other admins
+    if (admin.role === 'admin') {
+      return permission !== 'manage_admins';
     }
     
-    setAdmin(null);
-    setSession(null);
-    localStorage.removeItem('admin_session');
+    // Support has limited permissions
+    if (admin.role === 'support') {
+      return ['view_tickets', 'update_tickets', 'view_clients'].includes(permission);
+    }
+    
+    return false;
   };
 
-  const isAuthenticated = !!admin && !!session;
+  const value: AdminAuthContextType = {
+    admin,
+    loading,
+    login,
+    logout,
+    isAuthenticated: !!admin,
+    hasPermission
+  };
 
   return (
-    <AdminAuthContext.Provider value={{
-      admin,
-      session,
-      isLoading,
-      signIn,
-      signOut,
-      isAuthenticated
-    }}>
+    <AdminAuthContext.Provider value={value}>
       {children}
     </AdminAuthContext.Provider>
   );

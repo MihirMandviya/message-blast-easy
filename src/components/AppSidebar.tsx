@@ -28,8 +28,7 @@ const clientItems = [
   { 
     title: "Campaigns", 
     url: "/campaigns", 
-    icon: Target,
-    badge: "New"
+    icon: Target
   },
   { 
     title: "Message History", 
@@ -46,11 +45,7 @@ const clientItems = [
     url: "/contacts", 
     icon: Users
   },
-  { 
-    title: "Scheduled", 
-    url: "/scheduled", 
-    icon: Clock
-  },
+
   { 
     title: "Media", 
     url: "/media", 
@@ -95,11 +90,26 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname;
-  const { admin, signOut: adminLogout } = useAdminAuth();
-  const { client, signOut: clientLogout } = useClientAuth();
+  const { admin, signOut: adminLogout, isAuthenticated: isAdminAuthenticated } = useAdminAuth();
+  const { client, signOut: clientLogout, isAuthenticated: isClientAuthenticated } = useClientAuth();
 
-  const isAdmin = !!admin;
-  const isClient = !!client;
+  // Determine user type based on authentication state and current route
+  const isAdminRoute = currentPath.startsWith('/admin') || currentPath === '/users';
+  
+  // More explicit user type detection
+  let isAdmin = false;
+  let isClient = false;
+  
+  if (isAdminRoute && isAdminAuthenticated && admin) {
+    isAdmin = true;
+  } else if (!isAdminRoute && isClientAuthenticated && client) {
+    isClient = true;
+  }
+  
+  // Fallback: if we're on a client route and have client auth, show client interface
+  if (!isAdmin && !isClient && isClientAuthenticated && client) {
+    isClient = true;
+  }
 
   const handleLogout = () => {
     if (isAdmin) {

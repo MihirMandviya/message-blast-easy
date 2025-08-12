@@ -1,47 +1,61 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Eye, UserPlus, Settings, Key } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { supabase } from '@/integrations/supabase/client';
+import AddClientForm from '@/components/AddClientForm';
+import { 
+  Building2, 
+  Plus,
+  Search,
+  Eye,
+  Trash2,
+  Users,
+  MessageSquare,
+  FileText,
+  Image,
+  ArrowLeft,
+  Mail,
+  Phone,
+  Calendar,
+  CreditCard
+} from 'lucide-react';
 
-interface ClientUser {
+interface Client {
   id: string;
-  email: string;
+  org_id: string;
   business_name: string;
-  phone_number: string;
-  whatsapp_api_key: string | null;
-  whatsapp_number: string | null;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  last_login: string | null;
+  email: string;
+  phone_no: string;
+  wt_business_no: string;
+  api_key: string;
+  user_id: string;
+  password: string;
   is_active: boolean;
   subscription_plan: string;
-  subscription_expires_at: string | null;
+  subscription_start_date: string;
+  subscription_end_date: string;
+  max_users: number;
+  max_contacts: number;
+  max_campaigns: number;
+  created_at: string;
+  updated_at: string;
 }
 
-const ClientManagement = () => {
-  const [clients, setClients] = useState<ClientUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<ClientUser | null>(null);
-  const [newClient, setNewClient] = useState({
-    email: '',
-    business_name: '',
-    phone_number: '',
-    whatsapp_api_key: '',
-    whatsapp_number: ''
-  });
+export default function ClientManagement() {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const { admin } = useAdminAuth();
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAddClient, setShowAddClient] = useState(false);
+  const [deletingClient, setDeletingClient] = useState<string | null>(null);
 
   useEffect(() => {
     fetchClients();
@@ -49,8 +63,9 @@ const ClientManagement = () => {
 
   const fetchClients = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
-        .from('client_users')
+        .from('clients')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -64,393 +79,261 @@ const ClientManagement = () => {
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const generatePassword = () => {
-    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += charset.charAt(Math.floor(Math.random() * charset.length));
-    }
-    return password;
-  };
-
-  const generateApiKey = () => {
-    return 'wh_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  };
-
-  const handleCreateClient = async () => {
-    if (!admin) return;
-
-    const password = generatePassword();
-    const apiKey = newClient.whatsapp_api_key || generateApiKey();
-
-    try {
-      const { error } = await supabase
-        .from('client_users')
-        .insert([{
-          email: newClient.email,
-          password_hash: '$2b$10$' + btoa(password), // In production, use proper hashing
-          business_name: newClient.business_name,
-          phone_number: newClient.phone_number,
-          whatsapp_api_key: apiKey,
-          whatsapp_number: newClient.whatsapp_number,
-          created_by: admin.id
-        }]);
-
-      if (error) throw error;
-
-      // Log admin action
-      await supabase.from('admin_logs').insert([{
-        admin_id: admin.id,
-        action: 'CREATE_CLIENT',
-        target_type: 'client',
-        details: { client_email: newClient.email, generated_password: password, api_key: apiKey }
-      }]);
-
-      toast({
-        title: "Success",
-        description: `Client created successfully. Email: ${newClient.email}, Password: ${password}`,
-        duration: 10000
-      });
-
-      setIsCreateDialogOpen(false);
-      setNewClient({
-        email: '',
-        business_name: '',
-        phone_number: '',
-        whatsapp_api_key: '',
-        whatsapp_number: ''
-      });
-      fetchClients();
-    } catch (error) {
-      console.error('Error creating client:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create client",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleUpdateClient = async () => {
-    if (!editingClient || !admin) return;
-
-    try {
-      const { error } = await supabase
-        .from('client_users')
-        .update({
-          business_name: editingClient.business_name,
-          phone_number: editingClient.phone_number,
-          whatsapp_api_key: editingClient.whatsapp_api_key,
-          whatsapp_number: editingClient.whatsapp_number,
-          is_active: editingClient.is_active
-        })
-        .eq('id', editingClient.id);
-
-      if (error) throw error;
-
-      // Log admin action
-      await supabase.from('admin_logs').insert([{
-        admin_id: admin.id,
-        action: 'UPDATE_CLIENT',
-        target_type: 'client',
-        target_id: editingClient.id,
-        details: { client_email: editingClient.email }
-      }]);
-
-      toast({
-        title: "Success",
-        description: "Client updated successfully"
-      });
-
-      setEditingClient(null);
-      fetchClients();
-    } catch (error) {
-      console.error('Error updating client:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update client",
-        variant: "destructive"
-      });
+      setLoading(false);
     }
   };
 
   const handleDeleteClient = async (clientId: string) => {
-    if (!admin) return;
-
-    if (confirm('Are you sure you want to delete this client?')) {
-      try {
-        const { error } = await supabase
-          .from('client_users')
-          .delete()
-          .eq('id', clientId);
-
-        if (error) throw error;
-
-        // Log admin action
-        await supabase.from('admin_logs').insert([{
-          admin_id: admin.id,
-          action: 'DELETE_CLIENT',
-          target_type: 'client',
-          target_id: clientId
-        }]);
-
-        toast({
-          title: "Success",
-          description: "Client deleted successfully"
-        });
-
-        fetchClients();
-      } catch (error) {
-        console.error('Error deleting client:', error);
-        toast({
-          title: "Error",
-          description: "Failed to delete client",
-          variant: "destructive"
-        });
-      }
-    }
-  };
-
-  const resetPassword = async (clientId: string, email: string) => {
-    if (!admin) return;
-
-    const newPassword = generatePassword();
-    
     try {
-      const { error } = await supabase
+      setDeletingClient(clientId);
+      
+      // First, delete related client users
+      await supabase
         .from('client_users')
-        .update({
-          password_hash: '$2b$10$' + btoa(newPassword) // In production, use proper hashing
-        })
+        .delete()
+        .eq('client_id', clientId);
+
+      // Then delete the client
+      const { error } = await supabase
+        .from('clients')
+        .delete()
         .eq('id', clientId);
 
       if (error) throw error;
 
-      // Log admin action
-      await supabase.from('admin_logs').insert([{
-        admin_id: admin.id,
-        action: 'RESET_PASSWORD',
-        target_type: 'client',
-        target_id: clientId,
-        details: { client_email: email, new_password: newPassword }
-      }]);
-
       toast({
         title: "Success",
-        description: `Password reset successfully. New password: ${newPassword}`,
-        duration: 10000
+        description: "Client deleted successfully"
       });
+
+      fetchClients();
     } catch (error) {
-      console.error('Error resetting password:', error);
+      console.error('Error deleting client:', error);
       toast({
         title: "Error",
-        description: "Failed to reset password",
+        description: "Failed to delete client",
         variant: "destructive"
       });
+    } finally {
+      setDeletingClient(null);
     }
   };
 
-  if (isLoading) return <div>Loading...</div>;
+  const filteredClients = clients.filter(client => {
+    const matchesSearch = client.business_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         client.user_id.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-3xl font-bold">Client Management</h2>
-          <p className="text-muted-foreground">Manage your WhatsApp business clients</p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate('/admin/dashboard')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+              Client Management
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              Manage all client organizations
+            </p>
+          </div>
         </div>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        
+        <Dialog open={showAddClient} onOpenChange={setShowAddClient}>
           <DialogTrigger asChild>
             <Button>
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4 mr-2" />
               Add Client
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Create New Client</DialogTitle>
+              <DialogTitle>Add New Client</DialogTitle>
               <DialogDescription>
-                Add a new client to the system. Password will be generated automatically.
+                Create a new client organization with all necessary details
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={newClient.email}
-                  onChange={(e) => setNewClient({ ...newClient, email: e.target.value })}
-                  placeholder="client@example.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="business_name">Business Name</Label>
-                <Input
-                  id="business_name"
-                  value={newClient.business_name}
-                  onChange={(e) => setNewClient({ ...newClient, business_name: e.target.value })}
-                  placeholder="Business Name"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone_number">Phone Number</Label>
-                <Input
-                  id="phone_number"
-                  value={newClient.phone_number}
-                  onChange={(e) => setNewClient({ ...newClient, phone_number: e.target.value })}
-                  placeholder="+1234567890"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp_api_key">WhatsApp API Key</Label>
-                <Input
-                  id="whatsapp_api_key"
-                  value={newClient.whatsapp_api_key}
-                  onChange={(e) => setNewClient({ ...newClient, whatsapp_api_key: e.target.value })}
-                  placeholder="Enter API key or leave empty to auto-generate"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="whatsapp_number">WhatsApp Number</Label>
-                <Input
-                  id="whatsapp_number"
-                  value={newClient.whatsapp_number}
-                  onChange={(e) => setNewClient({ ...newClient, whatsapp_number: e.target.value })}
-                  placeholder="+1234567890"
-                />
-              </div>
-              <Button onClick={handleCreateClient} className="w-full">
-                Create Client
-              </Button>
-            </div>
+            <AddClientForm
+              onSuccess={() => {
+                setShowAddClient(false);
+                fetchClients();
+              }}
+              onCancel={() => setShowAddClient(false)}
+            />
           </DialogContent>
         </Dialog>
       </div>
 
-      <Card>
+      {/* Search */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search clients..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Client Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredClients.map((client) => (
+          <Card key={client.id} className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg hover:shadow-xl transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-primary" />
+                    {client.business_name}
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    ID: {client.user_id}
+                  </p>
+                </div>
+                <Badge className={client.is_active ? 'bg-green-500/20 text-green-700' : 'bg-red-500/20 text-red-700'}>
+                  {client.is_active ? 'Active' : 'Inactive'}
+                </Badge>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="space-y-4">
+              {/* Contact Info */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{client.email}</span>
+                </div>
+                {client.phone_no && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{client.phone_no}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span>Created: {new Date(client.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              {/* Subscription Info */}
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+                <Badge variant="outline">{client.subscription_plan}</Badge>
+              </div>
+
+              {/* Limits */}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div className="text-center p-2 bg-muted/50 rounded">
+                  <div className="font-medium">{client.max_users}</div>
+                  <div className="text-muted-foreground">Users</div>
+                </div>
+                <div className="text-center p-2 bg-muted/50 rounded">
+                  <div className="font-medium">{client.max_contacts}</div>
+                  <div className="text-muted-foreground">Contacts</div>
+                </div>
+                <div className="text-center p-2 bg-muted/50 rounded">
+                  <div className="font-medium">{client.max_campaigns}</div>
+                  <div className="text-muted-foreground">Campaigns</div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="flex-1"
+                  onClick={() => navigate(`/admin/client/${client.id}`)}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Details
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={() => handleDeleteClient(client.id)}
+                  disabled={deletingClient === client.id}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {filteredClients.length === 0 && !loading && (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Building2 className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No clients found</h3>
+            <p className="text-muted-foreground text-center mb-4">
+              {searchTerm ? 'No clients match your search criteria.' : 'Get started by adding your first client.'}
+            </p>
+            {!searchTerm && (
+              <Button onClick={() => setShowAddClient(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add First Client
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Stats Summary */}
+      <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
         <CardHeader>
-          <CardTitle>All Clients</CardTitle>
-          <CardDescription>
-            Total clients: {clients.length}
-          </CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-primary" />
+            Summary
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Business Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>WhatsApp Number</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Last Login</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clients.map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell className="font-medium">{client.business_name}</TableCell>
-                  <TableCell>{client.email}</TableCell>
-                  <TableCell>{client.phone_number}</TableCell>
-                  <TableCell>{client.whatsapp_number || 'Not set'}</TableCell>
-                  <TableCell>
-                    <Badge variant={client.is_active ? 'default' : 'destructive'}>
-                      {client.is_active ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {client.last_login ? new Date(client.last_login).toLocaleDateString() : 'Never'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setEditingClient(client)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => resetPassword(client.id, client.email)}
-                      >
-                        <Key className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteClient(client.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">{clients.length}</div>
+              <div className="text-sm text-muted-foreground">Total Clients</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {clients.filter(c => c.is_active).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Active Clients</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {clients.filter(c => c.subscription_plan === 'premium').length}
+              </div>
+              <div className="text-sm text-muted-foreground">Premium Plans</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">
+                {clients.filter(c => c.subscription_plan === 'enterprise').length}
+              </div>
+              <div className="text-sm text-muted-foreground">Enterprise Plans</div>
+            </div>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Edit Client Dialog */}
-      <Dialog open={!!editingClient} onOpenChange={() => setEditingClient(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Client</DialogTitle>
-            <DialogDescription>
-              Update client information
-            </DialogDescription>
-          </DialogHeader>
-          {editingClient && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit_business_name">Business Name</Label>
-                <Input
-                  id="edit_business_name"
-                  value={editingClient.business_name}
-                  onChange={(e) => setEditingClient({ ...editingClient, business_name: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_phone_number">Phone Number</Label>
-                <Input
-                  id="edit_phone_number"
-                  value={editingClient.phone_number}
-                  onChange={(e) => setEditingClient({ ...editingClient, phone_number: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_whatsapp_api_key">WhatsApp API Key</Label>
-                <Input
-                  id="edit_whatsapp_api_key"
-                  value={editingClient.whatsapp_api_key || ''}
-                  onChange={(e) => setEditingClient({ ...editingClient, whatsapp_api_key: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit_whatsapp_number">WhatsApp Number</Label>
-                <Input
-                  id="edit_whatsapp_number"
-                  value={editingClient.whatsapp_number || ''}
-                  onChange={(e) => setEditingClient({ ...editingClient, whatsapp_number: e.target.value })}
-                />
-              </div>
-              <Button onClick={handleUpdateClient} className="w-full">
-                Update Client
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
-};
-
-export default ClientManagement;
+}

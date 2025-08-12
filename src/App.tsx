@@ -22,11 +22,13 @@ import AdminDashboard from "./pages/AdminDashboard";
 import TemplateManagement from "./pages/TemplateManagement";
 import ContactManagement from "./pages/ContactManagement";
 import ListContacts from "./pages/ListContacts";
-import ScheduledMessages from "./pages/ScheduledMessages";
+
 import ClientManagement from "./pages/ClientManagement";
 import MediaManagement from "./pages/MediaManagement";
 import TimezoneTest from "./pages/TimezoneTest";
+import ClientDetail from "./pages/ClientDetail";
 import NotFound from "./pages/NotFound";
+
 
 const queryClient = new QueryClient();
 
@@ -41,7 +43,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/auth" element={<Auth />} />
-              <Route path="/admin-auth" element={<Auth />} />
+              <Route path="/admin-auth" element={<AdminAuth />} />
               
               {/* Client routes */}
               <Route path="/" element={
@@ -86,13 +88,7 @@ const App = () => (
                   </DashboardLayout>
                 </ProtectedRoute>
               } />
-              <Route path="/scheduled" element={
-                <ProtectedRoute>
-                  <DashboardLayout>
-                    <ScheduledMessages />
-                  </DashboardLayout>
-                </ProtectedRoute>
-              } />
+
               <Route path="/timezone-test" element={
                 <ProtectedRoute>
                   <DashboardLayout>
@@ -122,21 +118,35 @@ const App = () => (
                 </ProtectedRoute>
               } />
               
-              {/* Admin routes */}
-              <Route path="/admin" element={
-                <AdminRoute>
-                  <DashboardLayout>
-                    <AdminDashboard />
-                  </DashboardLayout>
-                </AdminRoute>
-              } />
-              <Route path="/admin/clients" element={
-                <AdminRoute>
-                  <DashboardLayout>
-                    <ClientManagement />
-                  </DashboardLayout>
-                </AdminRoute>
-              } />
+                             {/* Admin routes */}
+               <Route path="/admin" element={
+                 <AdminRoute>
+                   <DashboardLayout>
+                     <AdminDashboard />
+                   </DashboardLayout>
+                 </AdminRoute>
+               } />
+               <Route path="/admin/dashboard" element={
+                 <AdminRoute>
+                   <DashboardLayout>
+                     <AdminDashboard />
+                   </DashboardLayout>
+                 </AdminRoute>
+               } />
+               <Route path="/admin/clients" element={
+                 <AdminRoute>
+                   <DashboardLayout>
+                     <ClientManagement />
+                   </DashboardLayout>
+                 </AdminRoute>
+               } />
+               <Route path="/admin/client/:clientId" element={
+                 <AdminRoute>
+                   <DashboardLayout>
+                     <ClientDetail />
+                   </DashboardLayout>
+                 </AdminRoute>
+               } />
               <Route path="/users" element={
                 <AdminRoute>
                   <DashboardLayout>

@@ -552,7 +552,14 @@ const ListContacts = () => {
       )}
 
       {/* Import CSV Dialog */}
-      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+      <Dialog open={isImportDialogOpen} onOpenChange={(open) => {
+        setIsImportDialogOpen(open);
+        if (!open) {
+          // Reset import state when dialog is closed
+          setCsvFile(null);
+          setCsvContent('');
+        }
+      }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Import Contacts to {group.name}</DialogTitle>

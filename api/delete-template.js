@@ -36,6 +36,15 @@ export default async function handler(req, res) {
     if (!templateName) missingFields.push('templateName');
 
     if (missingFields.length > 0) {
+      console.error('Missing required fields:', missingFields);
+      console.error('Received data:', {
+        userId: userId || 'MISSING',
+        password: password ? '***' + password.slice(-4) : 'MISSING',
+        wabaNumber: wabaNumber || 'MISSING',
+        templateName: templateName || 'MISSING',
+        language: language || 'en'
+      });
+      
       return res.status(400).json({ 
         error: `Missing required fields: ${missingFields.join(', ')}`,
         receivedData: {

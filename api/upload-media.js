@@ -134,15 +134,41 @@ export default async function handler(req, res) {
     }
 
     if (data.status === 'success') {
+      // Get the client_id (from clients table) for this user
+      let clientOrgId = userId;
+      try {
+        // First try to get the client_id from the client_users table
+        const { data: clientUserData, error: clientUserError } = await supabase
+          .from('client_users')
+          .select('client_id')
+          .eq('user_id', userId)
+          .single();
+        
+        if (!clientUserError && clientUserData?.client_id) {
+          clientOrgId = clientUserData.client_id;
+          console.log('Retrieved client_id from database:', clientOrgId);
+        } else {
+          console.error('Could not find client organization ID');
+          throw new Error('Could not find client organization ID');
+        }
+      } catch (error) {
+        console.error('Error fetching client_id:', error);
+        throw error;
+      }
+
       // Store media info in database
       const { error: dbError } = await supabase
         .from('media')
         .upsert({
-          user_id: userId,
+          user_id: clientOrgId, // Use the organization/client ID
+          client_id: userId, // Use the current client_user ID
+          added_by: userId, // Set added_by to the current user
           name: identifier,
           description: description || '',
           media_type: mediaType,
-          whatsapp_media_id: data.mediaId || null,
+          media_id: data.mediaId || null, // Use media_id instead of whatsapp_media_id
+          status: 'active',
+          waba_number: null, // Will be set when syncing
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }, {
