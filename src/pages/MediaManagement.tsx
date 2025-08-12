@@ -6,17 +6,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, RefreshCw, Search, Image, Video, FileText, Music, Calendar, Clock } from 'lucide-react';
+import { Loader2, RefreshCw, Search, Upload, Download, Trash2, Image, Video, Music, FileText, Plus, Calendar, Clock, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 const MediaManagement: React.FC = () => {
-  const { media, isLoading, error, lastSync, syncMediaWithDatabase, getMediaByType } = useMedia();
+  const { media, isLoading, error, lastSync, syncMediaWithDatabase } = useMedia();
   const { client } = useClientAuth();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState<string>('all');
-  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedMediaType, setSelectedMediaType] = useState<string>('all');
+  const [uploading, setUploading] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    mediaType: 'image',
+    identifier: '',
+    description: '',
+    mediaFile: null as File | null
+  });
+  const [filePreview, setFilePreview] = useState<string | null>(null);
 
   const filteredMedia = useMemo(() => {
     let filtered = media;
@@ -29,47 +40,198 @@ const MediaManagement: React.FC = () => {
       );
     }
 
-    // Filter by type
-    if (selectedType !== 'all') {
-      filtered = filtered.filter(item => item.media_type === selectedType);
-    }
-
-    // Filter by status
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter(item => item.status === selectedStatus);
+    // Filter by media type
+    if (selectedMediaType !== 'all') {
+      filtered = filtered.filter(item => item.media_type === selectedMediaType);
     }
 
     return filtered;
-  }, [media, searchTerm, selectedType, selectedStatus]);
+  }, [media, searchTerm, selectedMediaType]);
 
-  const mediaByType = {
-    image: getMediaByType('image'),
-    video: getMediaByType('video'),
-    doc: getMediaByType('doc'),
-    audio: getMediaByType('audio')
-  };
-
-  const getMediaIcon = (type: string) => {
+  const getMediaTypeIcon = (type: string) => {
     switch (type) {
       case 'image':
         return <Image className="h-4 w-4" />;
       case 'video':
         return <Video className="h-4 w-4" />;
-      case 'doc':
-        return <FileText className="h-4 w-4" />;
       case 'audio':
         return <Music className="h-4 w-4" />;
+      case 'document':
+        return <FileText className="h-4 w-4" />;
       default:
         return <FileText className="h-4 w-4" />;
     }
   };
 
-  const formatDate = (timestamp: number) => {
+  const formatDate = (timestamp: string) => {
     return format(new Date(timestamp), 'MMM dd, yyyy HH:mm');
   };
 
   const handleSyncMedia = async () => {
     await syncMediaWithDatabase();
+  };
+
+     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+     const file = event.target.files?.[0];
+     if (file) {
+       setUploadForm(prev => ({ ...prev, mediaFile: file }));
+       
+       // Create preview for images
+       if (file.type.startsWith('image/')) {
+         const reader = new FileReader();
+         reader.onload = (e) => {
+           setFilePreview(e.target?.result as string);
+         };
+         reader.readAsDataURL(file);
+       } else {
+         setFilePreview(null);
+       }
+     } else {
+       setFilePreview(null);
+     }
+   };
+
+   const resetUploadForm = () => {
+     setUploadForm({
+       mediaType: 'image',
+       identifier: '',
+       description: '',
+       mediaFile: null
+     });
+     setFilePreview(null);
+     // Reset file input
+     setTimeout(() => {
+       const fileInput = document.getElementById('media-file') as HTMLInputElement;
+       if (fileInput) fileInput.value = '';
+     }, 100);
+   };
+
+  const handleUploadMedia = async () => {
+    if (!client) {
+      toast.error('Client data not available');
+      return;
+    }
+
+    if (!uploadForm.identifier || !uploadForm.mediaFile) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      // Convert file to base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target?.result as string;
+
+        const response = await fetch('/api/upload-media', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: client.user_id,
+            wabaNumber: client.whatsapp_number,
+            mediaType: uploadForm.mediaType,
+            identifier: uploadForm.identifier,
+            description: uploadForm.description,
+            mediaFile: base64Data
+          })
+        });
+
+        const data = await response.json();
+
+                 if (response.ok && data.success) {
+           toast.success('Media uploaded successfully');
+           // Close dialog and refresh media list
+           setShowUploadDialog(false);
+           resetUploadForm();
+           await syncMediaWithDatabase();
+         } else {
+           console.error('Upload media error details:', data);
+           const errorMessage = data.error || 'Failed to upload media';
+           const details = data.details ? `\nDetails: ${data.details}` : '';
+           toast.error(`${errorMessage}${details}`);
+         }
+      };
+
+      reader.readAsDataURL(uploadForm.mediaFile);
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      toast.error('Failed to upload media. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteMedia = async (mediaItem: any) => {
+    if (!client) {
+      toast.error('Client data not available');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete the media "${mediaItem.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/delete-media', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: client.user_id,
+          mediaId: mediaItem.whatsapp_media_id
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success(`Media "${mediaItem.name}" deleted successfully`);
+        await syncMediaWithDatabase();
+      } else {
+        toast.error(data.error || 'Failed to delete media');
+      }
+    } catch (error) {
+      console.error('Error deleting media:', error);
+      toast.error('Failed to delete media. Please try again.');
+    }
+  };
+
+  const handleDownloadMedia = async (mediaItem: any) => {
+    if (!client) {
+      toast.error('Client data not available');
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/download-media?userId=${client.user_id}&mediaId=${mediaItem.whatsapp_media_id}`, {
+        method: 'GET'
+      });
+
+      if (response.ok) {
+        // Create blob and download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = mediaItem.name || `media_${mediaItem.whatsapp_media_id}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast.success('Media downloaded successfully');
+      } else {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to download media');
+      }
+    } catch (error) {
+      console.error('Error downloading media:', error);
+      toast.error('Failed to download media. Please try again.');
+    }
   };
 
   if (!client) {
@@ -89,29 +251,142 @@ const MediaManagement: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold">Media Management</h1>
           <p className="text-muted-foreground">
-            Manage your WhatsApp media files and attachments
+            Manage your WhatsApp media files
           </p>
         </div>
-        <div className="flex space-x-2">
-          <Button onClick={handleSyncMedia} disabled={isLoading}>
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {isLoading ? 'Syncing...' : 'Sync Media'}
-          </Button>
-        </div>
+                 <div className="flex space-x-2">
+                        <Dialog open={showUploadDialog} onOpenChange={(open) => {
+               setShowUploadDialog(open);
+               if (!open) {
+                 resetUploadForm();
+               }
+             }}>
+             <DialogTrigger asChild>
+               <Button>
+                 <Plus className="h-4 w-4 mr-2" />
+                 Add Media
+               </Button>
+             </DialogTrigger>
+             <DialogContent className="sm:max-w-[500px]">
+               <DialogHeader>
+                 <DialogTitle className="flex items-center space-x-2">
+                   <Upload className="h-5 w-5" />
+                   <span>Upload New Media</span>
+                 </DialogTitle>
+                 <DialogDescription>
+                   Upload media files to your WhatsApp account
+                 </DialogDescription>
+               </DialogHeader>
+               <div className="space-y-4">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <div className="space-y-2">
+                     <Label htmlFor="media-type">Media Type</Label>
+                     <Select value={uploadForm.mediaType} onValueChange={(value) => setUploadForm(prev => ({ ...prev, mediaType: value }))}>
+                       <SelectTrigger>
+                         <SelectValue />
+                       </SelectTrigger>
+                       <SelectContent>
+                         <SelectItem value="image">Image</SelectItem>
+                         <SelectItem value="video">Video</SelectItem>
+                         <SelectItem value="audio">Audio</SelectItem>
+                         <SelectItem value="document">Document</SelectItem>
+                       </SelectContent>
+                     </Select>
+                   </div>
+                   <div className="space-y-2">
+                     <Label htmlFor="identifier">Identifier *</Label>
+                     <Input
+                       id="identifier"
+                       placeholder="Enter media identifier"
+                       value={uploadForm.identifier}
+                       onChange={(e) => setUploadForm(prev => ({ ...prev, identifier: e.target.value }))}
+                     />
+                   </div>
+                 </div>
+                 <div className="space-y-2">
+                   <Label htmlFor="description">Description</Label>
+                   <Textarea
+                     id="description"
+                     placeholder="Enter media description (optional)"
+                     value={uploadForm.description}
+                     onChange={(e) => setUploadForm(prev => ({ ...prev, description: e.target.value }))}
+                     rows={3}
+                   />
+                 </div>
+                 <div className="space-y-2">
+                   <Label htmlFor="media-file">Media File *</Label>
+                   <Input
+                     id="media-file"
+                     type="file"
+                     onChange={handleFileChange}
+                     accept={uploadForm.mediaType === 'image' ? 'image/*' : 
+                             uploadForm.mediaType === 'video' ? 'video/*' : 
+                             uploadForm.mediaType === 'audio' ? 'audio/*' : '*'}
+                   />
+                   {filePreview && (
+                     <div className="mt-2">
+                       <Label className="text-sm text-muted-foreground">Preview:</Label>
+                       <div className="mt-1 border rounded-md p-2">
+                         <img 
+                           src={filePreview} 
+                           alt="File preview" 
+                           className="max-w-full h-32 object-contain rounded"
+                         />
+                       </div>
+                     </div>
+                   )}
+                   {uploadForm.mediaFile && !filePreview && (
+                     <div className="mt-2">
+                       <Label className="text-sm text-muted-foreground">Selected file:</Label>
+                       <div className="mt-1 text-sm text-muted-foreground">
+                         {uploadForm.mediaFile.name} ({(uploadForm.mediaFile.size / 1024 / 1024).toFixed(2)} MB)
+                       </div>
+                     </div>
+                   )}
+                 </div>
+                 <div className="flex justify-end space-x-2 pt-4">
+                   <Button
+                     variant="outline"
+                     onClick={() => {
+                       setShowUploadDialog(false);
+                       resetUploadForm();
+                     }}
+                   >
+                     Cancel
+                   </Button>
+                                       <Button 
+                      onClick={handleUploadMedia}
+                      disabled={uploading || !uploadForm.identifier || !uploadForm.mediaFile}
+                    >
+                     {uploading ? (
+                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                     ) : (
+                       <Upload className="h-4 w-4 mr-2" />
+                     )}
+                     {uploading ? 'Uploading...' : 'Upload Media'}
+                   </Button>
+                 </div>
+               </div>
+             </DialogContent>
+           </Dialog>
+           <Button onClick={handleSyncMedia} disabled={isLoading}>
+             {isLoading ? (
+               <Loader2 className="h-4 w-4 animate-spin" />
+             ) : (
+               <RefreshCw className="h-4 w-4" />
+             )}
+             {isLoading ? 'Syncing...' : 'Sync Media'}
+           </Button>
+         </div>
       </div>
 
       {/* Status Bar */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
         <div className="flex items-center space-x-4">
           <span>Total Media: {media.length}</span>
-          <span>Images: {mediaByType.image.length}</span>
-          <span>Videos: {mediaByType.video.length}</span>
-          <span>Documents: {mediaByType.doc.length}</span>
-          <span>Audio: {mediaByType.audio.length}</span>
+          <span>Images: {media.filter(m => m.media_type === 'image').length}</span>
+          <span>Videos: {media.filter(m => m.media_type === 'video').length}</span>
+          <span>Documents: {media.filter(m => m.media_type === 'document').length}</span>
         </div>
         {lastSync && (
           <div className="flex items-center space-x-2">
@@ -128,6 +403,8 @@ const MediaManagement: React.FC = () => {
         </Alert>
       )}
 
+      
+
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -139,145 +416,96 @@ const MediaManagement: React.FC = () => {
             className="pl-10"
           />
         </div>
-        <Select value={selectedType} onValueChange={setSelectedType}>
+        <Select value={selectedMediaType} onValueChange={setSelectedMediaType}>
           <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by type" />
+            <SelectValue placeholder="Filter by media type" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             <SelectItem value="image">Images</SelectItem>
             <SelectItem value="video">Videos</SelectItem>
-            <SelectItem value="doc">Documents</SelectItem>
             <SelectItem value="audio">Audio</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="inactive">Inactive</SelectItem>
+            <SelectItem value="document">Documents</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Media Content */}
-      <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All Media ({filteredMedia.length})</TabsTrigger>
-          <TabsTrigger value="image">Images ({mediaByType.image.length})</TabsTrigger>
-          <TabsTrigger value="video">Videos ({mediaByType.video.length})</TabsTrigger>
-          <TabsTrigger value="doc">Documents ({mediaByType.doc.length})</TabsTrigger>
-          <TabsTrigger value="audio">Audio ({mediaByType.audio.length})</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="space-y-4">
-          <MediaGrid media={filteredMedia} />
-        </TabsContent>
-        <TabsContent value="image" className="space-y-4">
-          <MediaGrid media={mediaByType.image} />
-        </TabsContent>
-        <TabsContent value="video" className="space-y-4">
-          <MediaGrid media={mediaByType.video} />
-        </TabsContent>
-        <TabsContent value="doc" className="space-y-4">
-          <MediaGrid media={mediaByType.doc} />
-        </TabsContent>
-        <TabsContent value="audio" className="space-y-4">
-          <MediaGrid media={mediaByType.audio} />
-        </TabsContent>
-      </Tabs>
+      {/* Media Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {filteredMedia.map((mediaItem) => (
+          <Card key={mediaItem.id} className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {getMediaTypeIcon(mediaItem.media_type)}
+                  <Badge variant="outline" className="text-xs">
+                    {mediaItem.media_type}
+                  </Badge>
+                </div>
+                <div className="flex space-x-1">
+                  <Button
+                    onClick={() => handleDownloadMedia(mediaItem)}
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    title="Download media"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={() => handleDeleteMedia(mediaItem)}
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    title="Delete media"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <h3 className="font-semibold text-sm truncate" title={mediaItem.name}>
+                  {mediaItem.name}
+                </h3>
+                {mediaItem.description && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {mediaItem.description}
+                  </p>
+                )}
+              </div>
+              
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <div className="flex items-center space-x-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>Created: {formatDate(mediaItem.created_at)}</span>
+                </div>
+                {mediaItem.whatsapp_media_id && (
+                  <div className="text-xs text-muted-foreground">
+                    ID: {mediaItem.whatsapp_media_id}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
       {/* Empty State */}
       {filteredMedia.length === 0 && !isLoading && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Image className="h-12 w-12 text-muted-foreground mb-4" />
+            <Upload className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold mb-2">No media found</h3>
             <p className="text-muted-foreground text-center">
-              {searchTerm || selectedType !== 'all' || selectedStatus !== 'all'
+              {searchTerm || selectedMediaType !== 'all'
                 ? 'Try adjusting your filters to see more results.'
-                : 'Your media files will appear here once synced.'}
+                : 'Your media files will appear here once uploaded.'}
             </p>
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-};
-
-interface MediaGridProps {
-  media: any[];
-}
-
-const MediaGrid: React.FC<MediaGridProps> = ({ media }) => {
-  const getMediaIcon = (type: string) => {
-    switch (type) {
-      case 'image':
-        return <Image className="h-4 w-4" />;
-      case 'video':
-        return <Video className="h-4 w-4" />;
-      case 'doc':
-        return <FileText className="h-4 w-4" />;
-      case 'audio':
-        return <Music className="h-4 w-4" />;
-      default:
-        return <FileText className="h-4 w-4" />;
-    }
-  };
-
-  const formatDate = (timestamp: number) => {
-    return format(new Date(timestamp), 'MMM dd, yyyy HH:mm');
-  };
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {media.map((item) => (
-        <Card key={item.id} className="hover:shadow-md transition-shadow">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                {getMediaIcon(item.media_type)}
-                <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>
-                  {item.status}
-                </Badge>
-              </div>
-              <Badge variant="outline" className="text-xs">
-                {item.media_type}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <h3 className="font-semibold text-sm truncate" title={item.name}>
-                {item.name}
-              </h3>
-              {item.description && (
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2" title={item.description}>
-                  {item.description}
-                </p>
-              )}
-            </div>
-            
-            <div className="space-y-2 text-xs text-muted-foreground">
-              <div className="flex items-center space-x-1">
-                <Calendar className="h-3 w-3" />
-                <span>Created: {formatDate(item.creation_time)}</span>
-              </div>
-              <div className="flex items-center space-x-1">
-                <span>ID: {item.media_id}</span>
-              </div>
-              {item.waba_number && (
-                <div className="flex items-center space-x-1">
-                  <span>WABA: {item.waba_number}</span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
     </div>
   );
 };

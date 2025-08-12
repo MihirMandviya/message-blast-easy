@@ -117,7 +117,7 @@ export const useMedia = () => {
       console.error('Error fetching media from API:', error);
       throw error;
     }
-  }, [client?.whatsapp_api_key, client?.user_id]);
+  }, [client?.id]); // Only depend on client.id to prevent excessive re-renders
 
   const syncMediaWithDatabase = useCallback(async () => {
     if (!client) return;
@@ -131,14 +131,14 @@ export const useMedia = () => {
       console.log('API Media received:', apiMedia);
       if (!apiMedia) return;
 
-      // Clear existing media for this user
+      // Clear all existing media for this user first
       await supabase
         .from('media')
         .delete()
         .eq('user_id', client.id);
 
-      // Insert new media data
-      const mediaToInsert = apiMedia.map(item => ({
+      // Prepare media data with unique names to avoid conflicts
+      const mediaToInsert = apiMedia.map((item, index) => ({
         user_id: client.id,
         client_id: client.id,
         name: item.identifier,
@@ -150,12 +150,14 @@ export const useMedia = () => {
         waba_number: item.wabaNumber
       }));
 
+      // Insert new media data
       const { data, error } = await supabase
         .from('media')
         .insert(mediaToInsert)
         .select();
 
       if (error) {
+        console.error('Database insert error:', error);
         throw error;
       }
 
@@ -168,7 +170,7 @@ export const useMedia = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [client, fetchMediaFromAPI]);
+  }, [client?.id, fetchMediaFromAPI]);
 
   const loadMediaFromDatabase = useCallback(async () => {
     if (!client) return;
@@ -190,7 +192,7 @@ export const useMedia = () => {
       console.error('Error loading media from database:', error);
       setError(error instanceof Error ? error.message : 'Failed to load media');
     }
-  }, [client]);
+  }, [client?.id]);
 
   // Initial load and sync
   useEffect(() => {
@@ -198,7 +200,7 @@ export const useMedia = () => {
       loadMediaFromDatabase();
       syncMediaWithDatabase();
     }
-  }, [client, loadMediaFromDatabase, syncMediaWithDatabase]);
+  }, [client?.id, loadMediaFromDatabase, syncMediaWithDatabase]);
 
   // Debug effect to log client data
   useEffect(() => {
@@ -210,7 +212,7 @@ export const useMedia = () => {
         user_id: client.user_id || 'Missing'
       });
     }
-  }, [client]);
+  }, [client?.id]);
 
   // Debug effect to log media state changes
   useEffect(() => {
@@ -220,16 +222,16 @@ export const useMedia = () => {
     });
   }, [media]);
 
-  // Set up 30-second interval for syncing
+  // Set up 5-minute interval for syncing (5 minutes = 5 * 60 * 1000 = 300,000 ms)
   useEffect(() => {
     if (!client) return;
 
     const interval = setInterval(() => {
       syncMediaWithDatabase();
-    }, 30000); // 30 seconds
+    }, 300000); // 5 minutes
 
     return () => clearInterval(interval);
-  }, [client, syncMediaWithDatabase]);
+  }, [client?.id, syncMediaWithDatabase]);
 
   const getMediaByType = useCallback((type: string) => {
     return media.filter(item => item.media_type === type);

@@ -126,7 +126,7 @@ export const useTemplates = () => {
       console.error('Error fetching templates from API:', error);
       throw error;
     }
-  }, [client?.user_id, client?.whatsapp_api_key, client?.whatsapp_number]);
+  }, [client?.id]); // Only depend on client.id to prevent excessive re-renders
 
   const syncTemplatesWithDatabase = useCallback(async () => {
     if (!client) return;
@@ -182,7 +182,7 @@ export const useTemplates = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [client, fetchTemplatesFromAPI]);
+  }, [client?.id, fetchTemplatesFromAPI]);
 
   const loadTemplatesFromDatabase = useCallback(async () => {
     if (!client) return;
@@ -204,7 +204,7 @@ export const useTemplates = () => {
       console.error('Error loading templates from database:', error);
       setError(error instanceof Error ? error.message : 'Failed to load templates');
     }
-  }, [client]);
+  }, [client?.id]);
 
   // Initial load and sync
   useEffect(() => {
@@ -212,7 +212,7 @@ export const useTemplates = () => {
       loadTemplatesFromDatabase();
       syncTemplatesWithDatabase();
     }
-  }, [client, loadTemplatesFromDatabase, syncTemplatesWithDatabase]);
+  }, [client?.id, loadTemplatesFromDatabase, syncTemplatesWithDatabase]);
 
   // Debug effect to log client data
   useEffect(() => {
@@ -225,7 +225,7 @@ export const useTemplates = () => {
         whatsapp_number: client.whatsapp_number || 'Missing'
       });
     }
-  }, [client]);
+  }, [client?.id]);
 
   // Debug effect to log templates state changes
   useEffect(() => {
@@ -244,7 +244,7 @@ export const useTemplates = () => {
     }, 1800000); // 30 minutes
 
     return () => clearInterval(interval);
-  }, [client, syncTemplatesWithDatabase]);
+  }, [client?.id, syncTemplatesWithDatabase]);
 
   const getTemplatesByCategory = useCallback((category: string) => {
     return templates.filter(item => item.category === category);

@@ -75,6 +75,7 @@ serve(async (req) => {
           .select()
 
         if (error) {
+          console.error('Database insert error:', error)
           throw error
         }
 

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useTemplates } from '@/hooks/useTemplates';
 import { useClientAuth } from '@/hooks/useClientAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,13 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, RefreshCw, Search, MessageSquare, FileText, Image, Video, Music, Calendar, Clock, Globe, Tag, Plus } from 'lucide-react';
+import { Loader2, RefreshCw, Search, MessageSquare, FileText, Image, Video, Music, Calendar, Clock, Globe, Tag, Plus, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import CreateTemplateForm from '@/components/CreateTemplateForm';
+import { toast } from 'sonner';
 
 const TemplateManagement: React.FC = () => {
   const { templates, isLoading, error, lastSync, syncTemplatesWithDatabase, getTemplatesByCategory, getTemplatesByLanguage, getTemplatesByMediaType } = useTemplates();
-  const { client } = useClientAuth();
+  const { client, session } = useClientAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
@@ -109,6 +111,158 @@ const TemplateManagement: React.FC = () => {
     await syncTemplatesWithDatabase();
   };
 
+  const handleDeleteTemplate = async (template: any) => {
+    if (!client) {
+      toast.error('Client data not available');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete the template "${template.template_name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // Get password from database if not in session
+      let password = session?.password;
+      if (!password) {
+        console.log('🔍 Password not in session, fetching from database...');
+        const { data: clientData, error } = await supabase
+          .from('client_users')
+          .select('password')
+          .eq('id', client.id)
+          .single();
+        
+        if (error || !clientData) {
+          toast.error('Failed to get client credentials');
+          return;
+        }
+        
+        // Get the actual password from the database
+        password = clientData.password;
+        console.log('🔍 Using password from database');
+      }
+
+      // Debug: Log the client data being sent
+      console.log('🔍 Delete template request data:', {
+        userId: client.user_id,
+        password: password ? '***' + password.slice(-4) : 'NOT_SET',
+        wabaNumber: client.whatsapp_number,
+        templateName: template.template_name,
+        language: template.language
+      });
+
+      const response = await fetch('/api/delete-template', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: client.user_id,
+          password: password,
+          wabaNumber: client.whatsapp_number,
+          templateName: template.template_name,
+          language: template.language
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success(`Template "${template.template_name}" deleted successfully`);
+        // Refresh templates after deletion
+        await syncTemplatesWithDatabase();
+      } else {
+        console.error('Delete template error details:', data);
+        const errorMessage = data.error || 'Failed to delete template';
+        const details = data.details ? `\nDetails: ${data.details}` : '';
+        const apiUrl = data.apiUrl ? `\nAPI URL: ${data.apiUrl}` : '';
+        toast.error(`${errorMessage}${details}${apiUrl}`);
+      }
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast.error('Failed to delete template. Please try again.');
+    }
+  };
+
+  const handleDeleteAllTemplates = async () => {
+    if (!client) {
+      toast.error('Client data not available');
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ALL ${filteredTemplates.length} templates? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      // Get password from database if not in session
+      let password = session?.password;
+      if (!password) {
+        console.log('🔍 Password not in session, fetching from database...');
+        const { data: clientData, error } = await supabase
+          .from('client_users')
+          .select('password')
+          .eq('id', client.id)
+          .single();
+        
+        if (error || !clientData) {
+          toast.error('Failed to get client credentials');
+          return;
+        }
+        
+        // Get the actual password from the database
+        password = clientData.password;
+        console.log('🔍 Using password from database');
+      }
+
+      let deletedCount = 0;
+      let failedCount = 0;
+
+      for (const template of filteredTemplates) {
+        try {
+          const response = await fetch('/api/delete-template', {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              userId: client.user_id,
+              password: password || '',
+              wabaNumber: client.whatsapp_number,
+              templateName: template.template_name,
+              language: template.language
+            })
+          });
+
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            deletedCount++;
+          } else {
+            failedCount++;
+            console.error(`Failed to delete template ${template.template_name}:`, data.error);
+          }
+        } catch (error) {
+          failedCount++;
+          console.error(`Error deleting template ${template.template_name}:`, error);
+        }
+      }
+
+      // Refresh templates after bulk deletion
+      await syncTemplatesWithDatabase();
+
+      if (deletedCount > 0) {
+        toast.success(`Successfully deleted ${deletedCount} templates`);
+      }
+      if (failedCount > 0) {
+        toast.error(`Failed to delete ${failedCount} templates`);
+      }
+    } catch (error) {
+      console.error('Error in bulk delete operation:', error);
+      toast.error('Failed to complete bulk delete operation. Please try again.');
+    }
+  };
+
   if (!client) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -167,6 +321,17 @@ const TemplateManagement: React.FC = () => {
                 )}
                 {isLoading ? 'Syncing...' : 'Sync Templates'}
               </Button>
+              {filteredTemplates.length > 0 && (
+                <Button 
+                  onClick={handleDeleteAllTemplates} 
+                  variant="destructive" 
+                  size="sm"
+                  disabled={isLoading}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete All ({filteredTemplates.length})
+                </Button>
+              )}
             </div>
           </div>
 
@@ -253,19 +418,19 @@ const TemplateManagement: React.FC = () => {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          <TemplateGrid templates={filteredTemplates} />
+          <TemplateGrid templates={filteredTemplates} onDeleteTemplate={handleDeleteTemplate} />
         </TabsContent>
         <TabsContent value="marketing" className="space-y-4">
-          <TemplateGrid templates={templatesByCategory.marketing} />
+          <TemplateGrid templates={templatesByCategory.marketing} onDeleteTemplate={handleDeleteTemplate} />
         </TabsContent>
         <TabsContent value="utility" className="space-y-4">
-          <TemplateGrid templates={templatesByCategory.utility} />
+          <TemplateGrid templates={templatesByCategory.utility} onDeleteTemplate={handleDeleteTemplate} />
         </TabsContent>
         <TabsContent value="english" className="space-y-4">
-          <TemplateGrid templates={templatesByLanguage.english} />
+          <TemplateGrid templates={templatesByLanguage.english} onDeleteTemplate={handleDeleteTemplate} />
         </TabsContent>
         <TabsContent value="marathi" className="space-y-4">
-          <TemplateGrid templates={templatesByLanguage.marathi} />
+          <TemplateGrid templates={templatesByLanguage.marathi} onDeleteTemplate={handleDeleteTemplate} />
         </TabsContent>
       </Tabs>
 
@@ -293,7 +458,7 @@ interface TemplateGridProps {
   templates: any[];
 }
 
-const TemplateGrid: React.FC<TemplateGridProps> = ({ templates }) => {
+const TemplateGrid: React.FC<TemplateGridProps> = ({ templates, onDeleteTemplate }: { templates: any[], onDeleteTemplate: (template: any) => void }) => {
   const getMediaTypeIcon = (type: string) => {
     switch (type) {
       case 'text':
@@ -392,6 +557,19 @@ const TemplateGrid: React.FC<TemplateGridProps> = ({ templates }) => {
                 <span>Created: {formatDate(template.creation_time)}</span>
               </div>
             </div>
+            
+                         {/* Delete Button */}
+             <div className="pt-2 border-t flex justify-end">
+               <Button
+                 onClick={() => onDeleteTemplate(template)}
+                 variant="ghost"
+                 size="sm"
+                 className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                 title="Delete template"
+               >
+                 <Trash2 className="h-4 w-4" />
+               </Button>
+             </div>
           </CardContent>
         </Card>
       ))}

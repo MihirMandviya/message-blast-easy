@@ -99,7 +99,22 @@
     },
     "api/send-message.js": {
       "maxDuration": 30
-    }
+    },
+    "api/create-template.js": {
+      "maxDuration": 60
+    },
+            "api/delete-template.js": {
+          "maxDuration": 30
+        },
+        "api/upload-media.js": {
+          "maxDuration": 60
+        },
+        "api/delete-media.js": {
+          "maxDuration": 30
+        },
+        "api/download-media.js": {
+          "maxDuration": 60
+        }
   },
   "env": {
     "NODE_ENV": "production"

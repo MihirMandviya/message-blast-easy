@@ -22,6 +22,7 @@ interface ClientSession {
   client: ClientUser;
   token: string;
   session_id: string;
+  password?: string; // Temporarily store password for API calls
 }
 
 interface ClientAuthContextType {
@@ -118,11 +119,12 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
 
       const response = data as any;
       if (response.success) {
-        const sessionData: ClientSession = {
-          client: response.client,
-          token: response.token,
-          session_id: response.session_id
-        };
+              const sessionData: ClientSession = {
+        client: response.client,
+        token: response.token,
+        session_id: response.session_id,
+        password: password // Store password temporarily for API calls
+      };
         
         setSession(sessionData);
         setClient(response.client);

@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, X, Image, Video, FileText, Music, RefreshCw } from 'lucide-react';
+import { Loader2, Plus, X, Image, Video, FileText, Music, RefreshCw, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Button {
@@ -94,8 +94,16 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
   const handleMediaSelect = (mediaId: string) => {
     const selectedMedia = media.find(item => item.media_id === mediaId);
     if (selectedMedia) {
+      const mediaUrl = `https://theultimate.io/WAApi/media/download?userid=${client?.user_id}&mediaId=${mediaId}`;
+      console.log('Media selected:', {
+        mediaId,
+        mediaName: selectedMedia.name,
+        mediaUrl,
+        clientUserId: client?.user_id
+      });
+      
       setSelectedMediaId(mediaId);
-      setHeaderFileUrl(`https://theultimate.io/WAApi/media/download?userid=${client?.user_id}&mediaId=${mediaId}`);
+      setHeaderFileUrl(mediaUrl);
       setShowMediaSelector(false);
       toast.success(`Selected media: ${selectedMedia.name}`);
     }
@@ -109,6 +117,16 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
       toast.error('Failed to refresh media');
     }
   };
+
+  // Debug effect to monitor state changes
+  useEffect(() => {
+    console.log('CreateTemplateForm state update:', {
+      selectedMediaId,
+      headerFileUrl,
+      msgType,
+      mediaType
+    });
+  }, [selectedMediaId, headerFileUrl, msgType, mediaType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -179,6 +197,12 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
       if (msgType === 'media') {
         requestBody.mediaType = mediaType;
         
+        // Debug logging
+        console.log('Media template validation:');
+        console.log('- headerFileUrl:', headerFileUrl);
+        console.log('- headerFileUrl.trim():', headerFileUrl.trim());
+        console.log('- selectedMediaId:', selectedMediaId);
+        
         // Validate headerFile URL for media templates
         if (!headerFileUrl.trim()) {
           setError('Media file URL is required for media templates. Please provide a valid image, video, document, or audio URL.');
@@ -206,15 +230,18 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
       });
 
       const data = await response.json();
+      console.log('API Response:', data);
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to create template');
+        console.error('API Error Response:', data);
+        throw new Error(data.error || data.details || 'Failed to create template');
       }
 
       if (data.success) {
         toast.success('Template created successfully!');
         onSuccess?.();
       } else {
+        console.error('API Success but with error:', data);
         throw new Error(data.error || 'Failed to create template');
       }
     } catch (error) {
@@ -498,19 +525,33 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
                     {/* Manual URL Input */}
                     <div className="space-y-2">
                       <Label htmlFor="headerFileUrl">Media File URL *</Label>
-                      <Input
-                        id="headerFileUrl"
-                        value={headerFileUrl}
-                        onChange={(e) => setHeaderFileUrl(e.target.value)}
-                        placeholder="https://example.com/your-media-file.jpg"
-                        required
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="headerFileUrl"
+                          value={headerFileUrl}
+                          onChange={(e) => setHeaderFileUrl(e.target.value)}
+                          placeholder="https://example.com/your-media-file.jpg"
+                          required
+                          className={selectedMediaId ? 'border-green-500' : ''}
+                        />
+                        {selectedMediaId && (
+                          <Badge variant="default" className="bg-green-500">
+                            <Check className="h-3 w-3 mr-1" />
+                            Selected
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {selectedMediaId ? 
                           'Media file selected from your WhatsApp Business account' : 
                           'Provide a publicly accessible URL for your media file (image, video, document, or audio). The file must be accessible via HTTP/HTTPS.'
                         }
                       </p>
+                      {selectedMediaId && (
+                        <p className="text-sm text-green-600 font-medium">
+                          ✓ Media file URL automatically generated from your selection
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
