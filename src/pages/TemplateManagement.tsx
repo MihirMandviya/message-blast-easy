@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, RefreshCw, Search, MessageSquare, FileText, Image, Video, Music, Calendar, Clock, Globe, Tag } from 'lucide-react';
+import { Loader2, RefreshCw, Search, MessageSquare, FileText, Image, Video, Music, Calendar, Clock, Globe, Tag, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import CreateTemplateForm from '@/components/CreateTemplateForm';
 
 const TemplateManagement: React.FC = () => {
   const { templates, isLoading, error, lastSync, syncTemplatesWithDatabase, getTemplatesByCategory, getTemplatesByLanguage, getTemplatesByMediaType } = useTemplates();
@@ -18,6 +19,7 @@ const TemplateManagement: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
   const [selectedMediaType, setSelectedMediaType] = useState<string>('all');
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const filteredTemplates = useMemo(() => {
     let filtered = templates;
@@ -119,25 +121,54 @@ const TemplateManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Template Management</h1>
-          <p className="text-muted-foreground">
-            Manage your WhatsApp message templates
-          </p>
+      {showCreateForm ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">Create New Template</h1>
+            <Button
+              onClick={() => setShowCreateForm(false)}
+              variant="outline"
+              size="sm"
+            >
+              Back to Templates
+            </Button>
+          </div>
+          <CreateTemplateForm
+            onSuccess={() => {
+              setShowCreateForm(false);
+              syncTemplatesWithDatabase();
+            }}
+            onCancel={() => setShowCreateForm(false)}
+          />
         </div>
-        <div className="flex space-x-2">
-          <Button onClick={handleSyncTemplates} disabled={isLoading}>
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {isLoading ? 'Syncing...' : 'Sync Templates'}
-          </Button>
-        </div>
-      </div>
+      ) : (
+        <>
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Template Management</h1>
+              <p className="text-muted-foreground">
+                Manage your WhatsApp message templates
+              </p>
+            </div>
+            <div className="flex space-x-2">
+              <Button
+                onClick={() => setShowCreateForm(true)}
+                size="sm"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create Template
+              </Button>
+              <Button onClick={handleSyncTemplates} disabled={isLoading}>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {isLoading ? 'Syncing...' : 'Sync Templates'}
+              </Button>
+            </div>
+          </div>
 
       {/* Status Bar */}
       <div className="flex items-center justify-between text-sm text-muted-foreground">
@@ -251,6 +282,8 @@ const TemplateManagement: React.FC = () => {
             </p>
           </CardContent>
         </Card>
+      )}
+        </>
       )}
     </div>
   );

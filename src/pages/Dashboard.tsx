@@ -1,4 +1,4 @@
-import { MessageSquare, Users, BarChart3, Send, Settings, Clock, FileText, HelpCircle, TrendingUp, CheckCircle } from 'lucide-react';
+import { MessageSquare, Users, BarChart3, Send, Settings, Clock, FileText, HelpCircle, TrendingUp, CheckCircle, Wallet, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useClientAuth } from '@/hooks/useClientAuth';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useClientData } from '@/hooks/useClientData';
+import { useWalletBalance } from '@/hooks/useWalletBalance';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ const Dashboard = () => {
   const { client } = useClientAuth();
   const { admin } = useAdminAuth();
   const { getStats, loading: dataLoading } = useClientData();
+  const { balance, loading: walletLoading, error: walletError, fetchWalletBalance, formatBalance, formatExpiryDate } = useWalletBalance();
 
   const currentUser = admin || client;
   const userName = admin ? admin.full_name : client?.business_name;
@@ -69,6 +71,14 @@ const Dashboard = () => {
       action: () => navigate('/users'),
       color: 'bg-indigo-500',
       textColor: 'text-white'
+    },
+    {
+      title: 'Wallet Balances',
+      description: 'View client wallet balances',
+      icon: Wallet,
+      action: () => navigate('/admin/wallets'),
+      color: 'bg-green-500',
+      textColor: 'text-white'
     }
   ];
 
@@ -100,6 +110,61 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Wallet Balance - Prominent for clients at the top */}
+      {!isAdmin && (
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-500 rounded-full">
+                <Wallet className="h-6 w-6 text-white" />
+              </div>
+                             <div>
+                 <h2 className="text-lg font-semibold text-gray-900">Wallet Balance</h2>
+                 <p className="text-sm text-gray-600">Your current account balance</p>
+               </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                {walletLoading ? (
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
+                    <span className="text-sm text-gray-500">Loading...</span>
+                  </div>
+                                 ) : walletError ? (
+                   <div className="text-right">
+                     <p className="text-sm text-red-600">Unable to load balance</p>
+                     <p className="text-xs text-gray-500">Start proxy server: node proxy-server.js</p>
+                   </div>
+                ) : balance ? (
+                  <div className="text-right">
+                    <p className="text-3xl font-bold text-green-700">
+                      ₹{formatBalance(balance.smsBalance)}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Expires: {formatExpiryDate(balance.expDate)}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-right">
+                    <p className="text-sm text-gray-500">No balance data</p>
+                    <p className="text-xs text-gray-400">Click refresh to load</p>
+                  </div>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchWalletBalance}
+                disabled={walletLoading}
+                className="border-green-300 hover:bg-green-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${walletLoading ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Actions */}
       <div>
