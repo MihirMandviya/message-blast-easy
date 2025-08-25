@@ -175,19 +175,13 @@ export function AppSidebar() {
 
   return (
     <Sidebar className="border-r border-border/50 bg-gradient-to-br from-background via-background to-muted/30 shadow-xl w-64 min-w-64 h-screen flex flex-col">
-      <SidebarHeader className="border-b border-border/50 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 p-6 shadow-sm">
-        <div className="flex items-center space-x-3">
-                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-primary/90 to-primary/80 text-white shadow-lg">
-             <MessageSquare className="h-6 w-6" />
-           </div>
-          <div className="flex flex-col">
-            <h2 className="text-lg font-semibold text-foreground">
-              {isAdmin ? 'Admin Portal' : 'WhatsApp Hub'}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {isAdmin ? 'Administration Panel' : 'Message Management'}
-            </p>
-          </div>
+      <SidebarHeader className="border-b border-border/50 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 p-4 shadow-sm">
+        <div className="flex items-center justify-center w-full">
+          <img 
+            src="/logo2.png" 
+            alt="Tasknova Logo" 
+            className="h-12 w-full object-contain"
+          />
         </div>
       </SidebarHeader>
 

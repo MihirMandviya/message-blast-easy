@@ -56,18 +56,18 @@ const Dashboard = () => {
 
   const quickActions = [
     {
-      title: 'Send Message',
-      description: 'Send instant messages to your customers',
+      title: 'Create Campaign',
+      description: 'Create and send campaigns to your contacts',
       icon: Send,
-      action: () => navigate('/send'),
+      action: () => navigate('/campaigns'),
       color: 'bg-blue-500',
       textColor: 'text-white'
     },
     {
-      title: 'View Messages',
-      description: 'Check your message history and analytics',
+      title: 'Reports',
+      description: 'View detailed reports and analytics',
       icon: BarChart3,
-      action: () => navigate('/messages'),
+      action: () => navigate('/reports'),
       color: 'bg-green-500',
       textColor: 'text-white'
     },
@@ -77,14 +77,6 @@ const Dashboard = () => {
       icon: Users,
       action: () => navigate('/contacts'),
       color: 'bg-purple-500',
-      textColor: 'text-white'
-    },
-    {
-      title: 'Templates',
-      description: 'Create and manage message templates',
-      icon: FileText,
-      action: () => navigate('/templates'),
-      color: 'bg-orange-500',
       textColor: 'text-white'
     }
   ];
@@ -200,10 +192,69 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Messages</p>
+                <p className="text-2xl font-bold">
+                  {dataLoading ? '...' : stats.totalMessages}
+                </p>
+              </div>
+              <Send className="h-8 w-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Active Contacts</p>
+                <p className="text-2xl font-bold">
+                  {dataLoading ? '...' : stats.totalContacts}
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Templates</p>
+                <p className="text-2xl font-bold">
+                  {dataLoading ? '...' : stats.totalTemplates}
+                </p>
+              </div>
+              <FileText className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Delivered</p>
+                <p className="text-2xl font-bold">
+                  {dataLoading ? '...' : stats.messagesDelivered}
+                </p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-emerald-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Quick Actions */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {(isAdmin ? adminActions : quickActions).map((action, index) => (
             <Card key={index} className="cursor-pointer hover:shadow-md transition-shadow">
               <CardContent className="p-4">
@@ -303,9 +354,9 @@ const Dashboard = () => {
           <CardContent>
             <div className="space-y-3">
               <div className="p-3 border border-gray-200 rounded-lg">
-                <h4 className="font-medium text-sm mb-1">Send Your First Message</h4>
+                <h4 className="font-medium text-sm mb-1">Create Your First Campaign</h4>
                 <p className="text-xs text-gray-600">
-                  Start by sending a message to your customers using the Send Message feature.
+                  Start by creating a campaign to send messages to your contacts.
                 </p>
               </div>
               <div className="p-3 border border-gray-200 rounded-lg">
@@ -315,70 +366,11 @@ const Dashboard = () => {
                 </p>
               </div>
               <div className="p-3 border border-gray-200 rounded-lg">
-                <h4 className="font-medium text-sm mb-1">Create Templates</h4>
+                <h4 className="font-medium text-sm mb-1">View Reports</h4>
                 <p className="text-xs text-gray-600">
-                  Save time by creating message templates for common communications.
+                  Monitor your message performance and delivery statistics.
                 </p>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Total Messages</p>
-                <p className="text-2xl font-bold">
-                  {dataLoading ? '...' : stats.totalMessages}
-                </p>
-              </div>
-              <Send className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Active Contacts</p>
-                <p className="text-2xl font-bold">
-                  {dataLoading ? '...' : stats.totalContacts}
-                </p>
-              </div>
-              <Users className="h-8 w-8 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Templates</p>
-                <p className="text-2xl font-bold">
-                  {dataLoading ? '...' : stats.totalTemplates}
-                </p>
-              </div>
-              <FileText className="h-8 w-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Delivered</p>
-                <p className="text-2xl font-bold">
-                  {dataLoading ? '...' : stats.messagesDelivered}
-                </p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-emerald-500" />
             </div>
           </CardContent>
         </Card>
