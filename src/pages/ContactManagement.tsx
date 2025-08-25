@@ -420,7 +420,7 @@ const ContactManagement = () => {
       const { data, error } = await supabase.rpc('import_contacts_from_csv', {
         csv_data: csvContent,
         group_id: newContact.groupId,
-        client_id: client.id
+        p_client_id: client.id
       });
 
       if (error) throw error;

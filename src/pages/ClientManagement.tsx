@@ -47,11 +47,21 @@ interface Client {
   updated_at: string;
 }
 
+interface ClientStats {
+  client_id: string;
+  user_count: number;
+  contact_count: number;
+  campaign_count: number;
+  template_count: number;
+  media_count: number;
+}
+
 export default function ClientManagement() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { admin } = useAdminAuth();
   const [clients, setClients] = useState<Client[]>([]);
+  const [clientStats, setClientStats] = useState<Record<string, ClientStats>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddClient, setShowAddClient] = useState(false);
@@ -71,6 +81,9 @@ export default function ClientManagement() {
 
       if (error) throw error;
       setClients(data || []);
+
+      // Fetch stats for all clients
+      await fetchClientStats(data || []);
     } catch (error) {
       console.error('Error fetching clients:', error);
       toast({
@@ -80,6 +93,60 @@ export default function ClientManagement() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchClientStats = async (clientsData: Client[]) => {
+    try {
+      const stats: Record<string, ClientStats> = {};
+      
+      for (const client of clientsData) {
+        // Get client users for this client
+        const { data: users, error: usersError } = await supabase
+          .from('client_users')
+          .select('id')
+          .eq('client_id', client.id);
+
+        if (usersError) {
+          console.error('Error fetching users for client:', client.id, usersError);
+          continue;
+        }
+
+        const userIds = users?.map(u => u.id) || [];
+
+        // Fetch counts for each type of data
+        const [contactsResult, campaignsResult, templatesResult, mediaResult] = await Promise.all([
+          supabase
+            .from('contacts')
+            .select('id', { count: 'exact', head: true })
+            .in('client_id', userIds),
+          supabase
+            .from('campaigns')
+            .select('id', { count: 'exact', head: true })
+            .in('client_id', userIds),
+          supabase
+            .from('templates')
+            .select('id', { count: 'exact', head: true })
+            .in('client_id', userIds),
+          supabase
+            .from('media')
+            .select('id', { count: 'exact', head: true })
+            .in('client_id', userIds)
+        ]);
+
+        stats[client.id] = {
+          client_id: client.id,
+          user_count: userIds.length,
+          contact_count: contactsResult.count || 0,
+          campaign_count: campaignsResult.count || 0,
+          template_count: templatesResult.count || 0,
+          media_count: mediaResult.count || 0
+        };
+      }
+
+      setClientStats(stats);
+    } catch (error) {
+      console.error('Error fetching client stats:', error);
     }
   };
 
@@ -239,20 +306,40 @@ export default function ClientManagement() {
                 <Badge variant="outline">{client.subscription_plan}</Badge>
               </div>
 
-              {/* Limits */}
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <div className="text-center p-2 bg-muted/50 rounded">
-                  <div className="font-medium">{client.max_users}</div>
+              {/* Actual Stats */}
+              <div className="grid grid-cols-4 gap-2 text-xs">
+                <div className="text-center p-2 bg-blue-50 rounded">
+                  <div className="font-medium text-blue-600">
+                    {clientStats[client.id]?.user_count || 0}
+                  </div>
                   <div className="text-muted-foreground">Users</div>
                 </div>
-                <div className="text-center p-2 bg-muted/50 rounded">
-                  <div className="font-medium">{client.max_contacts}</div>
+                <div className="text-center p-2 bg-green-50 rounded">
+                  <div className="font-medium text-green-600">
+                    {clientStats[client.id]?.contact_count || 0}
+                  </div>
                   <div className="text-muted-foreground">Contacts</div>
                 </div>
-                <div className="text-center p-2 bg-muted/50 rounded">
-                  <div className="font-medium">{client.max_campaigns}</div>
+                <div className="text-center p-2 bg-purple-50 rounded">
+                  <div className="font-medium text-purple-600">
+                    {clientStats[client.id]?.campaign_count || 0}
+                  </div>
                   <div className="text-muted-foreground">Campaigns</div>
                 </div>
+                <div className="text-center p-2 bg-orange-50 rounded">
+                  <div className="font-medium text-orange-600">
+                    {clientStats[client.id]?.template_count || 0}
+                  </div>
+                  <div className="text-muted-foreground">Templates</div>
+                </div>
+              </div>
+              
+              {/* Media Count */}
+              <div className="text-center p-2 bg-yellow-50 rounded">
+                <div className="font-medium text-yellow-600">
+                  {clientStats[client.id]?.media_count || 0}
+                </div>
+                <div className="text-muted-foreground text-xs">Media Files</div>
               </div>
 
               {/* Actions */}
@@ -330,6 +417,43 @@ export default function ClientManagement() {
                 {clients.filter(c => c.subscription_plan === 'enterprise').length}
               </div>
               <div className="text-sm text-muted-foreground">Enterprise Plans</div>
+            </div>
+          </div>
+          
+          {/* Total Usage Stats */}
+          <div className="mt-6 pt-6 border-t">
+            <h4 className="text-lg font-semibold mb-4 text-center">Total Usage Across All Clients</h4>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="text-center">
+                <div className="text-xl font-bold text-blue-600">
+                  {Object.values(clientStats).reduce((sum, stats) => sum + stats.user_count, 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">Total Users</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl font-bold text-green-600">
+                  {Object.values(clientStats).reduce((sum, stats) => sum + stats.contact_count, 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">Total Contacts</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl font-bold text-purple-600">
+                  {Object.values(clientStats).reduce((sum, stats) => sum + stats.campaign_count, 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">Total Campaigns</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl font-bold text-orange-600">
+                  {Object.values(clientStats).reduce((sum, stats) => sum + stats.template_count, 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">Total Templates</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl font-bold text-yellow-600">
+                  {Object.values(clientStats).reduce((sum, stats) => sum + stats.media_count, 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">Total Media</div>
+              </div>
             </div>
           </div>
         </CardContent>

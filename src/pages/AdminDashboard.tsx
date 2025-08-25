@@ -141,7 +141,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={() => navigate('/admin/clients')}>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -174,6 +174,18 @@ export default function AdminDashboard() {
                 <p className="text-sm text-muted-foreground">System configuration</p>
               </div>
               <Settings className="h-5 w-5 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-500/20 bg-gradient-to-br from-orange-500/10 to-orange-500/5 shadow-lg hover:shadow-xl transition-shadow cursor-pointer" onClick={() => navigate('/admin/templates')}>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-lg">Template Management</h3>
+                <p className="text-sm text-muted-foreground">Manage all templates</p>
+              </div>
+              <FileText className="h-5 w-5 text-orange-500" />
             </div>
           </CardContent>
         </Card>

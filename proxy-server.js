@@ -148,6 +148,120 @@ app.post('/api/fetch-templates', async (req, res) => {
   }
 });
 
+// Proxy endpoint for reports API
+app.post('/api/fetch-reports', async (req, res) => {
+  try {
+    logToFile('=== REPORTS API REQUEST RECEIVED ===');
+    logToFile(`Request Method: ${req.method}`);
+    logToFile(`Request Headers: ${JSON.stringify(req.headers)}`);
+    logToFile(`Request Body: ${JSON.stringify(req.body)}`);
+    logToFile('=====================================');
+    
+    const { userId, fromDate, toDate, mobileNo, pageLimit, startCursor } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing required field: userId' });
+    }
+
+    // Fetch credentials from database
+    const { data: clientData, error: clientError } = await supabase
+      .from('client_users')
+      .select('password, whatsapp_number')
+      .eq('user_id', userId)
+      .single();
+
+    if (clientError || !clientData) {
+      logToFile(`Database error: ${clientError?.message || 'Client not found'}`);
+      return res.status(400).json({ error: 'Failed to get client credentials from database' });
+    }
+
+    const { password, whatsapp_number: wabaNumber } = clientData;
+
+    logToFile('=== REPORTS API REQUEST DETAILS ===');
+    logToFile(`User ID: ${userId}`);
+    logToFile(`Password: ${password ? '***' + password.slice(-4) : 'NOT_SET'}`);
+    logToFile(`WhatsApp Number: ${wabaNumber}`);
+    logToFile(`From Date: ${fromDate || 'Not specified'}`);
+    logToFile(`To Date: ${toDate || 'Not specified'}`);
+    logToFile(`Mobile Number: ${mobileNo || 'Not specified'}`);
+    logToFile(`Page Limit: ${pageLimit || '100'}`);
+    logToFile(`Start Cursor: ${startCursor || '1'}`);
+    logToFile('===================================');
+
+    // Create FormData for multipart/form-data (like the working request)
+    const formData = new FormData();
+    formData.append('userid', userId);
+    formData.append('password', password);
+    formData.append('wabaNumber', wabaNumber);
+    formData.append('fromDate', fromDate || '');
+    formData.append('toDate', toDate || '');
+    formData.append('mobileNo', mobileNo || '');
+    formData.append('pageLimit', pageLimit || '100');
+    formData.append('startCursor', startCursor || '1');
+
+    logToFile('=== REPORTS API REQUEST BODY ===');
+    logToFile(`Form Data: ${formData.toString()}`);
+    logToFile('================================');
+
+    const response = await fetch('https://theultimate.io/WAApi/report', {
+      method: 'POST',
+      headers: {
+        'Cookie': 'SERVERID=webC1'
+        // Note: Don't set Content-Type header for FormData - let the browser set it with boundary
+      },
+      body: formData
+    });
+
+    logToFile('=== REPORTS API RESPONSE DETAILS ===');
+    logToFile(`Response Status: ${response.status}`);
+    logToFile(`Response Headers: ${JSON.stringify(Object.fromEntries(response.headers.entries()))}`);
+    logToFile('====================================');
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logToFile(`API Error: ${errorText}`);
+      return res.status(response.status).json({ 
+        error: `HTTP error! status: ${response.status}`,
+        details: errorText
+      });
+    }
+
+    const responseText = await response.text();
+    logToFile(`External API Response: ${responseText}`);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      logToFile(`JSON Parse Error: ${parseError.message}`);
+      return res.status(500).json({ 
+        error: 'Invalid JSON response from external API',
+        details: responseText.substring(0, 500)
+      });
+    }
+    
+    if (data.status === 'success') {
+      return res.json({
+        success: true,
+        data: data.data,
+        message: data.msg
+      });
+    } else {
+      return res.status(400).json({ 
+        error: data.msg || 'Failed to fetch reports',
+        apiResponse: data
+      });
+    }
+
+  } catch (error) {
+    logToFile(`Proxy error: ${error.message}`);
+    return res.status(500).json({ 
+      error: 'Internal server error',
+      details: error.message
+    });
+  }
+});
+
 // Proxy endpoint for creating templates
 app.post('/api/create-template', async (req, res) => {
   try {

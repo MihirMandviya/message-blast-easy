@@ -7,6 +7,7 @@ import { useClientAuth } from '@/hooks/useClientAuth';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useClientData } from '@/hooks/useClientData';
 import { useWalletBalance } from '@/hooks/useWalletBalance';
+import { useRecentActivity } from '@/hooks/useRecentActivity';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -15,10 +16,43 @@ const Dashboard = () => {
   const { admin } = useAdminAuth();
   const { getStats, loading: dataLoading } = useClientData();
   const { balance, loading: walletLoading, error: walletError, fetchWalletBalance, formatBalance, formatExpiryDate } = useWalletBalance();
+  const { activities, loading: activitiesLoading, formatTimeAgo, fetchRecentActivities } = useRecentActivity();
 
   const currentUser = admin || client;
   const userName = admin ? admin.full_name : client?.business_name;
   const stats = getStats();
+
+  // Helper function to get icon component
+  const getActivityIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'Send':
+        return <Send className="h-4 w-4" />;
+      case 'FileText':
+        return <FileText className="h-4 w-4" />;
+      case 'Users':
+        return <Users className="h-4 w-4" />;
+      case 'MessageSquare':
+        return <MessageSquare className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  // Helper function to get color class
+  const getActivityColor = (color: string) => {
+    switch (color) {
+      case 'green':
+        return 'bg-green-500';
+      case 'blue':
+        return 'bg-blue-500';
+      case 'purple':
+        return 'bg-purple-500';
+      case 'gray':
+        return 'bg-gray-500';
+      default:
+        return 'bg-gray-500';
+    }
+  };
 
   const quickActions = [
     {
@@ -193,38 +227,66 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5" />
-              Recent Activity
-            </CardTitle>
-            <CardDescription>
-              Your latest messaging activities
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                <div>
+                  <CardTitle>Recent Activity</CardTitle>
+                  <CardDescription>
+                    Your latest messaging activities
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchRecentActivities}
+                disabled={activitiesLoading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`h-4 w-4 ${activitiesLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-sm">Messages sent successfully</span>
-                </div>
-                <span className="text-sm text-gray-500">2 hours ago</span>
+            {activitiesLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg animate-pulse">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 bg-gray-300 rounded-full"></div>
+                      <div className="h-4 bg-gray-300 rounded w-32"></div>
+                    </div>
+                    <div className="h-4 bg-gray-300 rounded w-16"></div>
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span className="text-sm">New template created</span>
-                </div>
-                <span className="text-sm text-gray-500">5 hours ago</span>
+            ) : activities.length > 0 ? (
+              <div className="space-y-3">
+                {activities.slice(0, 5).map((activity) => (
+                  <div key={activity.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 ${getActivityColor(activity.color)} rounded-full`}></div>
+                      <div className="flex items-center gap-2">
+                        {getActivityIcon(activity.icon)}
+                        <div>
+                          <div className="text-sm font-medium">{activity.title}</div>
+                          <div className="text-xs text-gray-600">{activity.description}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-sm text-gray-500">{formatTimeAgo(activity.timestamp)}</span>
+                  </div>
+                ))}
               </div>
-              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                  <span className="text-sm">Contacts updated</span>
-                </div>
-                <span className="text-sm text-gray-500">1 day ago</span>
+            ) : (
+              <div className="text-center py-6 text-gray-500">
+                <Clock className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm">No recent activity</p>
+                <p className="text-xs">Start using the platform to see your activities here</p>
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 

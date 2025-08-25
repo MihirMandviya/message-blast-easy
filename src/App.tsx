@@ -19,6 +19,7 @@ import SettingsPage from "./pages/SettingsPage";
 import UserManagement from "./pages/UserManagement";
 import SupportTickets from "./pages/SupportTickets";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminTemplateManagement from "./pages/AdminTemplateManagement";
 import TemplateManagement from "./pages/TemplateManagement";
 import ContactManagement from "./pages/ContactManagement";
 import ListContacts from "./pages/ListContacts";
@@ -27,6 +28,9 @@ import ClientManagement from "./pages/ClientManagement";
 import MediaManagement from "./pages/MediaManagement";
 import TimezoneTest from "./pages/TimezoneTest";
 import ClientDetail from "./pages/ClientDetail";
+import Reports from "./pages/Reports";
+
+import CampaignDetails from "./pages/CampaignDetails";
 import NotFound from "./pages/NotFound";
 
 
@@ -117,6 +121,21 @@ const App = () => (
                   </DashboardLayout>
                 </ProtectedRoute>
               } />
+              <Route path="/reports" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Reports />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/campaign/:campaignId" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CampaignDetails />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
               
                              {/* Admin routes */}
                <Route path="/admin" element={
@@ -144,6 +163,20 @@ const App = () => (
                  <AdminRoute>
                    <DashboardLayout>
                      <ClientDetail />
+                   </DashboardLayout>
+                 </AdminRoute>
+               } />
+               <Route path="/admin/contacts/:listId" element={
+                 <AdminRoute>
+                   <DashboardLayout>
+                     <ListContacts />
+                   </DashboardLayout>
+                 </AdminRoute>
+               } />
+               <Route path="/admin/templates" element={
+                 <AdminRoute>
+                   <DashboardLayout>
+                     <AdminTemplateManagement />
                    </DashboardLayout>
                  </AdminRoute>
                } />

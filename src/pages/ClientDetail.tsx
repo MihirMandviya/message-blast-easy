@@ -7,6 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { supabase } from '@/integrations/supabase/client';
+import AddUserForm from '@/components/AddUserForm';
+import AdminCampaignForm from '@/components/AdminCampaignForm';
+import CampaignDetailView from '@/components/CampaignDetailView';
+import EditCampaignForm from '@/components/EditCampaignForm';
+import AdminCreateTemplateForm from '@/components/AdminCreateTemplateForm';
+import TemplateViewModal from '@/components/TemplateViewModal';
 import { 
   Building2, 
   ArrowLeft,
@@ -24,7 +30,9 @@ import {
   Plus,
   Trash2,
   Edit,
-  ExternalLink
+  ExternalLink,
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
 
 interface Client {
@@ -158,6 +166,9 @@ export default function ClientDetail() {
   const [contactLists, setContactLists] = useState<ContactList[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [showCreateTemplateForm, setShowCreateTemplateForm] = useState(false);
+  const [syncingTemplates, setSyncingTemplates] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
   useEffect(() => {
     if (clientId) {
@@ -179,16 +190,25 @@ export default function ClientDetail() {
       if (clientError) throw clientError;
       setClient(clientData);
 
-      // First fetch users, then fetch related data
-      await fetchUsers();
+      // First fetch users
+      const { data: usersData, error: usersError } = await supabase
+        .from('client_users')
+        .select('*')
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+
+      if (usersError) throw usersError;
+      setUsers(usersData || []);
+
+      // Now fetch related data using the users data we just fetched
+      const userIds = usersData?.map(u => u.id) || [];
       
-      // Now fetch related data that depends on users
       await Promise.all([
-        fetchCampaigns(),
-        fetchTemplates(),
-        fetchMedia(),
-        fetchContacts(),
-        fetchContactLists()
+        fetchCampaigns(userIds),
+        fetchTemplates(userIds),
+        fetchMedia(userIds),
+        fetchContacts(userIds),
+        fetchContactLists(userIds)
       ]);
 
     } catch (error) {
@@ -203,66 +223,56 @@ export default function ClientDetail() {
     }
   };
 
-  const fetchUsers = async () => {
-    const { data, error } = await supabase
-      .from('client_users')
-      .select('*')
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false });
-
-    if (!error) setUsers(data || []);
-  };
-
-  const fetchCampaigns = async () => {
-    // Get campaigns using user_id from client_users
+  const fetchCampaigns = async (userIds: string[]) => {
+    // Get campaigns using client_id from client_users
     const { data, error } = await supabase
       .from('campaigns')
       .select('*')
-      .in('user_id', users.map(u => u.id))
+      .in('client_id', userIds)
       .order('created_at', { ascending: false });
 
     if (!error) setCampaigns(data || []);
   };
 
-  const fetchTemplates = async () => {
-    // Get templates using user_id from client_users
+  const fetchTemplates = async (userIds: string[]) => {
+    // Get templates using client_id from client_users
     const { data, error } = await supabase
       .from('templates')
       .select('*')
-      .in('user_id', users.map(u => u.id))
+      .in('client_id', userIds)
       .order('created_at', { ascending: false });
 
     if (!error) setTemplates(data || []);
   };
 
-  const fetchMedia = async () => {
-    // Get media using user_id from client_users
+  const fetchMedia = async (userIds: string[]) => {
+    // Get media using client_id from client_users
     const { data, error } = await supabase
       .from('media')
       .select('*')
-      .in('user_id', users.map(u => u.id))
+      .in('client_id', userIds)
       .order('created_at', { ascending: false });
 
     if (!error) setMedia(data || []);
   };
 
-  const fetchContacts = async () => {
-    // Get contacts using user_id from client_users
+  const fetchContacts = async (userIds: string[]) => {
+    // Get contacts using client_id from client_users
     const { data, error } = await supabase
       .from('contacts')
       .select('*')
-      .in('user_id', users.map(u => u.id))
+      .in('client_id', userIds)
       .order('created_at', { ascending: false });
 
     if (!error) setContacts(data || []);
   };
 
-  const fetchContactLists = async () => {
-    // Get contact lists using user_id from client_users
+  const fetchContactLists = async (userIds: string[]) => {
+    // Get contact lists using client_id from client_users
     const { data, error } = await supabase
-      .from('contact_lists')
+      .from('groups')
       .select('*')
-      .in('user_id', users.map(u => u.id))
+      .in('client_id', userIds)
       .order('created_at', { ascending: false });
 
     if (!error) setContactLists(data || []);
@@ -282,7 +292,7 @@ export default function ClientDetail() {
         description: "User deleted successfully"
       });
 
-      fetchUsers();
+      fetchClientData();
     } catch (error) {
       console.error('Error deleting user:', error);
       toast({
@@ -291,6 +301,158 @@ export default function ClientDetail() {
         variant: "destructive"
       });
     }
+  };
+
+  const handleDeleteCampaign = async (campaignId: string) => {
+    try {
+      const confirmed = window.confirm(
+        "Are you sure you want to delete this campaign? This action cannot be undone."
+      );
+
+      if (!confirmed) return;
+
+      const { error } = await supabase
+        .from('campaigns')
+        .delete()
+        .eq('id', campaignId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Campaign deleted successfully"
+      });
+
+      fetchClientData();
+    } catch (error) {
+      console.error('Error deleting campaign:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete campaign",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleSyncTemplates = async () => {
+    if (!client) return;
+    
+    try {
+      setSyncingTemplates(true);
+      
+      // Get the primary user for this client
+      const primaryUser = users.find(u => u.is_primary_user);
+      if (!primaryUser) {
+        toast({
+          title: "Error",
+          description: "No primary user found for this client",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Call the fetch-templates API
+      const response = await fetch('/api/fetch-templates', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: primaryUser.user_id,
+          apiKey: primaryUser.whatsapp_api_key,
+          wabaNumber: primaryUser.whatsapp_number
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success && data.templates) {
+        // Clear existing templates for this client
+        await supabase
+          .from('templates')
+          .delete()
+          .eq('client_id', primaryUser.id);
+
+        // Insert new templates
+        const templatesToInsert = data.templates.map((template: any) => ({
+          user_id: client.id,
+          client_id: primaryUser.id,
+          template_name: template.templateName,
+          creation_time: template.creationTime,
+          whatsapp_status: template.whatsAppStatus,
+          system_status: template.systemStatus,
+          media_type: template.mediaType,
+          language: template.language,
+          category: template.category,
+          template_body: template.template?.body || null,
+          template_header: template.template?.header || null,
+          template_footer: template.template?.footer || null,
+          buttons1_type: template.template?.buttons1_type || null,
+          buttons1_title: template.template?.buttons1_title || null
+        }));
+
+        const { error: insertError } = await supabase
+          .from('templates')
+          .insert(templatesToInsert);
+
+        if (insertError) throw insertError;
+
+        toast({
+          title: "Success",
+          description: `Synced ${data.templates.length} templates from WhatsApp API`
+        });
+
+        // Refresh templates
+        fetchClientData();
+      } else {
+        throw new Error(data.error || 'Failed to sync templates');
+      }
+    } catch (error) {
+      console.error('Error syncing templates:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to sync templates",
+        variant: "destructive"
+      });
+    } finally {
+      setSyncingTemplates(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (templateId: string) => {
+    try {
+      const confirmed = window.confirm(
+        "Are you sure you want to delete this template? This action cannot be undone."
+      );
+
+      if (!confirmed) return;
+
+      const { error } = await supabase
+        .from('templates')
+        .delete()
+        .eq('id', templateId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Template deleted successfully"
+      });
+
+      fetchClientData();
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete template",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleTemplateCreated = () => {
+    setShowCreateTemplateForm(false);
+    fetchClientData();
   };
 
   if (loading) {
@@ -425,7 +587,7 @@ export default function ClientDetail() {
           <TabsTrigger value="campaigns">Campaigns ({campaigns.length})</TabsTrigger>
           <TabsTrigger value="templates">Templates ({templates.length})</TabsTrigger>
           <TabsTrigger value="media">Media ({media.length})</TabsTrigger>
-          <TabsTrigger value="contacts">Contacts ({contacts.length})</TabsTrigger>
+                     <TabsTrigger value="contacts">Contact Lists ({contactLists.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -512,16 +674,13 @@ export default function ClientDetail() {
         <TabsContent value="users" className="space-y-4">
           <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Client Users
-                </CardTitle>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add User
-                </Button>
-              </div>
+                             <div className="flex items-center justify-between">
+                 <CardTitle className="flex items-center gap-2">
+                   <Users className="h-5 w-5 text-primary" />
+                   Client Users
+                 </CardTitle>
+                 <AddUserForm clientId={clientId!} onUserAdded={fetchClientData} />
+               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -574,46 +733,55 @@ export default function ClientDetail() {
         <TabsContent value="campaigns" className="space-y-4">
           <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  Campaigns
-                </CardTitle>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Campaign
-                </Button>
-              </div>
+                             <div className="flex items-center justify-between">
+                 <CardTitle className="flex items-center gap-2">
+                   <MessageSquare className="h-5 w-5 text-primary" />
+                   Campaigns
+                 </CardTitle>
+                 <AdminCampaignForm clientId={clientId!} onCampaignCreated={fetchClientData} />
+               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {campaigns.map((campaign) => (
-                  <div key={campaign.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{campaign.name}</h3>
-                      <p className="text-sm text-muted-foreground">{campaign.description}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <Badge className={campaign.status === 'active' ? 'bg-green-500/20 text-green-700' : 'bg-yellow-500/20 text-yellow-700'}>
-                          {campaign.status}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground">
-                          {new Date(campaign.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button variant="destructive" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                                 {campaigns.map((campaign) => (
+                   <div key={campaign.id} className="flex items-center justify-between p-4 border rounded-lg">
+                     <div className="flex-1">
+                       <h3 className="font-semibold">{campaign.name}</h3>
+                       <p className="text-sm text-muted-foreground">{campaign.description}</p>
+                       <div className="flex items-center gap-2 mt-2">
+                         <Badge className={
+                           campaign.status === 'sent' ? 'bg-green-500/20 text-green-700' :
+                           campaign.status === 'sending' ? 'bg-yellow-500/20 text-yellow-700' :
+                           campaign.status === 'scheduled' ? 'bg-orange-500/20 text-orange-700' :
+                           'bg-blue-500/20 text-blue-700'
+                         }>
+                           {campaign.status}
+                         </Badge>
+                         <span className="text-sm text-muted-foreground">
+                           {new Date(campaign.created_at).toLocaleDateString()}
+                         </span>
+                         {campaign.sent_count > 0 && (
+                           <span className="text-sm text-muted-foreground">
+                             • {campaign.sent_count} sent, {campaign.delivered_count} delivered
+                           </span>
+                         )}
+                       </div>
+                     </div>
+                     <div className="flex gap-2">
+                       <CampaignDetailView campaignId={campaign.id} onCampaignUpdated={fetchClientData} />
+                       {(campaign.status === 'draft' || campaign.status === 'scheduled') && (
+                         <EditCampaignForm campaignId={campaign.id} onCampaignUpdated={fetchClientData} />
+                       )}
+                       <Button 
+                         variant="destructive" 
+                         size="sm"
+                         onClick={() => handleDeleteCampaign(campaign.id)}
+                       >
+                         <Trash2 className="h-4 w-4" />
+                       </Button>
+                     </div>
+                   </div>
+                 ))}
                 
                 {campaigns.length === 0 && (
                   <div className="text-center py-8">
@@ -635,53 +803,125 @@ export default function ClientDetail() {
                   <FileText className="h-5 w-5 text-primary" />
                   Templates
                 </CardTitle>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Template
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleSyncTemplates}
+                    disabled={syncingTemplates}
+                    variant="outline"
+                  >
+                    {syncingTemplates ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    {syncingTemplates ? 'Syncing...' : 'Sync Templates'}
+                  </Button>
+                  <Button onClick={() => setShowCreateTemplateForm(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Template
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                                 {templates.map((template) => (
-                   <div key={template.id} className="flex items-center justify-between p-4 border rounded-lg">
-                     <div className="flex-1">
-                       <h3 className="font-semibold">{template.template_name}</h3>
-                       <p className="text-sm text-muted-foreground line-clamp-2">{template.template_body}</p>
-                       <div className="flex items-center gap-2 mt-2">
-                         <Badge className={template.whatsapp_status === 'APPROVED' ? 'bg-green-500/20 text-green-700' : 'bg-yellow-500/20 text-yellow-700'}>
-                           {template.whatsapp_status}
-                         </Badge>
-                         <span className="text-sm text-muted-foreground">
-                           {new Date(template.created_at).toLocaleDateString()}
-                         </span>
-                       </div>
-                     </div>
-                     <div className="flex gap-2">
-                       <Button variant="outline" size="sm">
+                {templates.map((template) => (
+                  <div key={template.id} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex-1">
+                      <h3 className="font-semibold">{template.template_name}</h3>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {template.template_body || template.template_header || 'No content'}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge className={
+                          template.whatsapp_status === 'APPROVED' ? 'bg-green-500/20 text-green-700' :
+                          template.whatsapp_status === 'PENDING' ? 'bg-yellow-500/20 text-yellow-700' :
+                          template.whatsapp_status === 'REJECTED' ? 'bg-red-500/20 text-red-700' :
+                          'bg-gray-500/20 text-gray-700'
+                        }>
+                          {template.whatsapp_status || 'UNKNOWN'}
+                        </Badge>
+                        <Badge variant="outline">{template.category}</Badge>
+                        <Badge variant="outline">{template.language}</Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {new Date(template.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                                         <div className="flex gap-2">
+                       <Button 
+                         variant="outline" 
+                         size="sm"
+                         onClick={() => setSelectedTemplate(template)}
+                       >
                          <Eye className="h-4 w-4" />
                        </Button>
                        <Button variant="outline" size="sm">
                          <Edit className="h-4 w-4" />
                        </Button>
-                       <Button variant="destructive" size="sm">
+                       <Button 
+                         variant="destructive" 
+                         size="sm"
+                         onClick={() => handleDeleteTemplate(template.id)}
+                       >
                          <Trash2 className="h-4 w-4" />
                        </Button>
                      </div>
-                   </div>
-                 ))}
+                  </div>
+                ))}
                 
                 {templates.length === 0 && (
                   <div className="text-center py-8">
                     <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-semibold mb-2">No templates found</h3>
                     <p className="text-muted-foreground">This client has no templates yet.</p>
+                    <div className="mt-4 flex gap-2 justify-center">
+                      <Button onClick={() => setShowCreateTemplateForm(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create Template
+                      </Button>
+                      <Button variant="outline" onClick={handleSyncTemplates}>
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Sync from WhatsApp
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+
+          {/* Template Creation Modal */}
+          {showCreateTemplateForm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+              <div className="bg-background rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-semibold">Create Template for {client?.business_name}</h2>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCreateTemplateForm(false)}
+                  >
+                    ×
+                  </Button>
+                </div>
+                <AdminCreateTemplateForm
+                  onSuccess={handleTemplateCreated}
+                  onCancel={() => setShowCreateTemplateForm(false)}
+                  selectedClientId={clientId!}
+                />
+              </div>
+            </div>
+                     )}
+
+           {/* Template View Modal */}
+           {selectedTemplate && (
+             <TemplateViewModal
+               template={selectedTemplate}
+               onClose={() => setSelectedTemplate(null)}
+             />
+           )}
+         </TabsContent>
 
         <TabsContent value="media" className="space-y-4">
           <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
@@ -729,57 +969,108 @@ export default function ClientDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="contacts" className="space-y-4">
-          <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Contacts
-                </CardTitle>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Contact
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                                 {contacts.map((contact) => (
-                   <div key={contact.id} className="flex items-center justify-between p-4 border rounded-lg">
-                     <div className="flex-1">
-                       <h3 className="font-semibold">{contact.name}</h3>
-                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                         <span>{contact.phone}</span>
-                         {contact.email && <span>{contact.email}</span>}
-                         <span>{new Date(contact.created_at).toLocaleDateString()}</span>
+                 <TabsContent value="contacts" className="space-y-4">
+           <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
+             <CardHeader>
+               <div className="flex items-center justify-between">
+                 <CardTitle className="flex items-center gap-2">
+                   <Users className="h-5 w-5 text-primary" />
+                   Contact Lists
+                 </CardTitle>
+                 <Button>
+                   <Plus className="h-4 w-4 mr-2" />
+                   Add Contact List
+                 </Button>
+               </div>
+             </CardHeader>
+             <CardContent>
+               <div className="space-y-6">
+                 {contactLists.map((list) => {
+                   const listContacts = contacts.filter(contact => contact.group_id === list.id);
+                   return (
+                     <div key={list.id} className="border rounded-lg p-4">
+                       <div className="flex items-center justify-between mb-4">
+                         <div>
+                           <h3 className="font-semibold text-lg">{list.name}</h3>
+                           <p className="text-sm text-muted-foreground">{list.description}</p>
+                           <div className="flex items-center gap-4 mt-2">
+                             <Badge variant="outline">{listContacts.length} contacts</Badge>
+                             <span className="text-sm text-muted-foreground">
+                               Created: {new Date(list.created_at).toLocaleDateString()}
+                             </span>
+                           </div>
+                         </div>
+                         <div className="flex gap-2">
+                           <Button variant="outline" size="sm">
+                             <Plus className="h-4 w-4 mr-2" />
+                             Add Contact
+                           </Button>
+                           <Button 
+                             variant="outline" 
+                             size="sm"
+                             onClick={() => navigate(`/admin/contacts/${list.id}?clientId=${clientId}`)}
+                           >
+                             <Eye className="h-4 w-4" />
+                           </Button>
+                           <Button variant="outline" size="sm">
+                             <Edit className="h-4 w-4" />
+                           </Button>
+                           <Button variant="destructive" size="sm">
+                             <Trash2 className="h-4 w-4" />
+                           </Button>
+                         </div>
+                       </div>
+                       
+                       {/* Contacts in this list */}
+                       <div className="space-y-2">
+                         <h4 className="font-medium text-sm text-muted-foreground">Contacts in this list:</h4>
+                         {listContacts.length > 0 ? (
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                             {listContacts.slice(0, 6).map((contact) => (
+                               <div key={contact.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                                 <div>
+                                   <p className="font-medium text-sm">{contact.name}</p>
+                                   <p className="text-xs text-muted-foreground">{contact.phone}</p>
+                                 </div>
+                                 <div className="flex gap-1">
+                                   <Button variant="ghost" size="sm">
+                                     <Eye className="h-3 w-3" />
+                                   </Button>
+                                   <Button variant="ghost" size="sm">
+                                     <Edit className="h-3 w-3" />
+                                   </Button>
+                                 </div>
+                               </div>
+                             ))}
+                             {listContacts.length > 6 && (
+                               <div className="col-span-full text-center py-2">
+                                 <p className="text-sm text-muted-foreground">
+                                   +{listContacts.length - 6} more contacts
+                                 </p>
+                               </div>
+                             )}
+                           </div>
+                         ) : (
+                           <div className="text-center py-4 bg-muted/30 rounded">
+                             <p className="text-sm text-muted-foreground">No contacts in this list</p>
+                           </div>
+                         )}
                        </div>
                      </div>
-                     <div className="flex gap-2">
-                       <Button variant="outline" size="sm">
-                         <Eye className="h-4 w-4" />
-                       </Button>
-                       <Button variant="outline" size="sm">
-                         <Edit className="h-4 w-4" />
-                       </Button>
-                       <Button variant="destructive" size="sm">
-                         <Trash2 className="h-4 w-4" />
-                       </Button>
-                     </div>
+                   );
+                 })}
+                 
+                 {contactLists.length === 0 && (
+                   <div className="text-center py-8">
+                     <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                     <h3 className="text-lg font-semibold mb-2">No contact lists found</h3>
+                     <p className="text-muted-foreground">This client has no contact lists yet.</p>
                    </div>
-                 ))}
-                
-                {contacts.length === 0 && (
-                  <div className="text-center py-8">
-                    <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No contacts found</h3>
-                    <p className="text-muted-foreground">This client has no contacts yet.</p>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                 )}
+               </div>
+             </CardContent>
+           </Card>
+         </TabsContent>
       </Tabs>
     </div>
   );

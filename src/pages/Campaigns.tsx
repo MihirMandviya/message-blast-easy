@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Users, MessageSquare, Target, Calendar, Send, Eye, Edit, Trash2, RotateCcw, RefreshCw, Clock, AlertTriangle } from "lucide-react";
+import { Plus, Users, MessageSquare, Target, Calendar, Send, Eye, Edit, Trash2, RotateCcw, RefreshCw, Clock, AlertTriangle, Wallet } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useClientAuth } from "@/hooks/useClientAuth";
+import { useWalletBalance } from "@/hooks/useWalletBalance";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -79,9 +81,12 @@ export default function Campaigns() {
   const [availableMedia, setAvailableMedia] = useState<Array<{ id: string; name: string; media_type: string; media_id: string; description: string }>>([]);
   const [sendingCampaigns, setSendingCampaigns] = useState<Set<string>>(new Set());
   const [overdueCampaigns, setOverdueCampaigns] = useState<number>(0);
+  const [showWalletBalance, setShowWalletBalance] = useState(false);
 
   const { toast } = useToast();
   const { client, session: clientSession } = useClientAuth();
+  const { balance, loading: walletLoading, error: walletError, fetchWalletBalance, formatBalance, formatExpiryDate } = useWalletBalance();
+  const navigate = useNavigate();
 
   // Function to check if campaign can be retried/resent
   const canRetryCampaign = (campaign: Campaign) => {
@@ -204,7 +209,7 @@ export default function Campaigns() {
     try {
       setLoading(true);
 
-      // Load campaigns with related data
+      // Build query for campaigns
       const { data: campaignsData, error: campaignsError } = await supabase
         .from('campaigns')
         .select('*')
@@ -995,6 +1000,108 @@ export default function Campaigns() {
         variant: failureCount > 0 ? "destructive" : "default",
       });
 
+      // Show a toast message about the wait period
+      toast({
+        title: "Campaign Sent Successfully!",
+        description: "Reports will be automatically fetched in 25 seconds. Please wait before viewing campaign details.",
+        duration: 3000,
+      });
+
+            // Trigger automatic report fetching after 20-30 seconds
+      setTimeout(async () => {
+        try {
+          console.log('Triggering automatic report fetch for campaign:', campaignId);
+          
+          // Get the updated campaign with sent_count and updated_at timestamp
+          const { data: updatedCampaign, error: campaignError } = await supabase
+            .from('campaigns')
+            .select('*')
+            .eq('id', campaignId)
+            .single();
+
+          if (campaignError || !updatedCampaign) {
+            console.error('Error fetching updated campaign:', campaignError);
+            return;
+          }
+
+          // Simple approach: Get messages from the last 1 hour and take the latest ones
+          const now = new Date();
+          const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
+          
+          // Use UTC components to avoid timezone issues
+          const fromDate = `${oneHourAgo.getUTCFullYear()}-${String(oneHourAgo.getUTCMonth() + 1).padStart(2, '0')}-${String(oneHourAgo.getUTCDate()).padStart(2, '0')} ${String(oneHourAgo.getUTCHours()).padStart(2, '0')}:${String(oneHourAgo.getUTCMinutes()).padStart(2, '0')}:${String(oneHourAgo.getUTCSeconds()).padStart(2, '0')}`;
+          const toDate = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')} ${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')}`;
+
+          console.log('Fetch time range:', fromDate, 'to', toDate);
+
+          const requestBody = {
+            userId: client?.user_id,
+            fromDate: fromDate,
+            toDate: toDate,
+            mobileNo: '',
+            pageLimit: 200, // Get more records to ensure we capture all messages
+            startCursor: '1'
+          };
+
+          console.log('Automatic report fetch request:', requestBody);
+
+          const response = await fetch('http://localhost:3001/api/fetch-reports', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          const responseText = await response.text();
+          console.log('Automatic report fetch response:', responseText);
+          
+          let data;
+          try {
+            data = JSON.parse(responseText);
+          } catch (parseError) {
+            console.error('JSON Parse Error in automatic fetch:', parseError);
+            return;
+          }
+
+          if (response.ok && data.success && data.data.records) {
+            // Simple approach: Sort by submitTime (latest first) and take the first N messages
+            const campaignMessages = data.data.records
+              .sort((a: any, b: any) => parseInt(b.submitTime) - parseInt(a.submitTime))
+              .slice(0, updatedCampaign.sent_count || totalContacts);
+
+            console.log(`Got ${campaignMessages.length} latest messages for campaign ${campaignId} from ${data.data.records.length} total messages`);
+            console.log('Message timestamps:', campaignMessages.map((msg: any) => {
+              const msgTime = parseInt(msg.submitTime);
+              return `${new Date(msgTime).toISOString()} (${msgTime})`;
+            }));
+
+            // Update the campaign with the reports data
+            const { error: updateError } = await supabase
+              .from('campaigns')
+              .update({ 
+                reports_data: campaignMessages,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', campaignId);
+
+            if (updateError) {
+              console.error('Error updating campaign with reports data:', updateError);
+            } else {
+              console.log('Campaign reports data updated successfully');
+              toast({
+                title: "Reports Updated",
+                description: `Campaign reports have been automatically fetched and updated`,
+              });
+            }
+          } else {
+            console.error('Failed to fetch reports automatically:', data.error || 'Unknown error');
+          }
+        } catch (error) {
+          console.error('Error in automatic report fetching:', error);
+        }
+      }, 25000); // 25 seconds delay
+
       // Reload campaigns to update the UI
       loadData();
 
@@ -1558,21 +1665,61 @@ export default function Campaigns() {
           <h1 className="text-3xl font-bold">Campaigns</h1>
           <p className="text-muted-foreground">Create and manage your WhatsApp campaigns</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Create Campaign
-          </Button>
-          <Button
-            onClick={processSendingCampaigns}
-            variant="outline"
-            className="flex items-center gap-2"
-            title="Process campaigns with 'sending' status"
-          >
-            <Send className="h-4 w-4" />
-            Process Sending
-          </Button>
-        </div>
+                 <div className="flex gap-2">
+           <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
+             <Plus className="h-4 w-4" />
+             Create Campaign
+           </Button>
+           {/* Wallet Balance Icon */}
+           <div className="relative">
+             <Button
+               variant="outline"
+               size="sm"
+               onClick={async () => {
+                 await fetchWalletBalance();
+                 setShowWalletBalance(true);
+                 setTimeout(() => setShowWalletBalance(false), 3000); // Hide after 3 seconds
+               }}
+               disabled={walletLoading}
+               className="relative"
+               title="Click to view wallet balance"
+             >
+               <Wallet className="h-4 w-4" />
+               {walletLoading && (
+                 <div className="absolute -top-1 -right-1">
+                   <RefreshCw className="h-3 w-3 animate-spin text-green-600" />
+                 </div>
+               )}
+               {balance && !walletLoading && (
+                 <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                   ₹
+                 </div>
+               )}
+             </Button>
+             
+             {/* Wallet Balance Tooltip */}
+             {showWalletBalance && balance && (
+               <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 min-w-[200px]">
+                 <div className="flex items-center gap-2 mb-2">
+                   <Wallet className="h-4 w-4 text-green-600" />
+                   <span className="font-medium text-sm">Wallet Balance</span>
+                 </div>
+                 <div className="space-y-1">
+                   <div className="flex justify-between text-sm">
+                     <span className="text-gray-600">SMS Balance:</span>
+                     <span className="font-medium">₹{formatBalance(balance.smsBalance)}</span>
+                   </div>
+                   {balance.expiryDate && (
+                     <div className="flex justify-between text-sm">
+                       <span className="text-gray-600">Expires:</span>
+                       <span className="font-medium">{formatExpiryDate(balance.expiryDate)}</span>
+                     </div>
+                   )}
+                 </div>
+               </div>
+             )}
+           </div>
+         </div>
       </div>
 
       {/* Create Campaign Form */}
@@ -1960,35 +2107,17 @@ export default function Campaigns() {
               <span>Live updates every minute</span>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={loadData}
-              size="sm"
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </Button>
-            <Button
-              variant="outline"
-              onClick={processScheduledCampaigns}
-              size="sm"
-              className="flex items-center gap-2"
-              title="Process campaigns with 'scheduled' status"
-            >
-              <Clock className="h-4 w-4" />
-              Process Scheduled
-              {overdueCampaigns > 0 && (
-                <Badge variant="destructive" className="ml-1">
-                  {overdueCampaigns}
-                </Badge>
-              )}
-            </Button>
-            <Button onClick={() => setShowCreateForm(true)}>
-              Create Campaign
-            </Button>
-          </div>
+                                                               <div className="flex gap-2">
+             <Button
+               variant="outline"
+               onClick={loadData}
+               size="sm"
+               className="flex items-center gap-2"
+             >
+               <RefreshCw className="h-4 w-4" />
+               Refresh
+             </Button>
+           </div>
         </div>
         {campaigns.length === 0 ? (
           <Card>
@@ -2128,36 +2257,21 @@ export default function Campaigns() {
                             </Button>
                           )}
 
-                          {/* Resend Campaign Button */}
-                          {canResendCampaign(campaign) && (
-                            <Button
-                              onClick={() => resendCampaign(campaign.id)}
-                              size="sm"
-                              disabled={sendingCampaigns.has(campaign.id)}
-                              variant="outline"
-                              className="border-blue-200 text-blue-700 hover:bg-blue-50"
-                            >
-                              {sendingCampaigns.has(campaign.id) ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2" />
-                                  Resending...
-                                </>
-                              ) : (
-                                <>
-                                  <RefreshCw className="h-4 w-4" />
-                                  Resend All
-                                </>
-                              )}
-                            </Button>
-                          )}
+
                         </>
                       )}
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate(`/campaign/${campaign.id}`)}
+                      >
                         <Eye className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      {campaign.status !== 'sent' && (
+                        <Button variant="outline" size="sm">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"

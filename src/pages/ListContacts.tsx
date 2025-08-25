@@ -1,287 +1,178 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Plus, Edit, Trash2, Search, Mail, Phone, ArrowLeft, Download, Import, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useClientAuth } from '@/hooks/useClientAuth';
+import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { 
+  ArrowLeft,
+  Users,
+  Search,
+  Plus,
+  Download,
+  Upload,
+  Eye,
+  Edit,
+  Trash2,
+  Phone,
+  Mail,
+  Calendar
+} from 'lucide-react';
 
 interface Contact {
   id: string;
   name: string;
   phone: string;
-  email?: string;
+  email: string;
   tags: string[];
-  notes?: string;
+  custom_fields: any;
+  notes: string;
   created_at: string;
   updated_at: string;
+  user_id: string;
+  client_id: string;
   group_id: string;
 }
 
-interface Group {
+interface ContactList {
   id: string;
   name: string;
-  description?: string;
+  description: string;
   created_at: string;
   updated_at: string;
+  user_id: string;
+  client_id: string;
 }
 
-const ListContacts = () => {
+export default function ListContacts() {
   const { listId } = useParams<{ listId: string }>();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { client } = useClientAuth();
   const { toast } = useToast();
-
+  const { admin } = useAdminAuth();
+  
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [group, setGroup] = useState<Group | null>(null);
+  const [contactList, setContactList] = useState<ContactList | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvContent, setCsvContent] = useState('');
-  const [importing, setImporting] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
 
-  const [newContact, setNewContact] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    tags: '',
-    notes: ''
-  });
+  // Get clientId from URL params if available
+  const clientId = searchParams.get('clientId');
 
   useEffect(() => {
-    if (listId && client) {
-      loadGroupAndContacts();
+    if (listId) {
+      fetchListData();
     }
-  }, [listId, client]);
+  }, [listId]);
 
-  const loadGroupAndContacts = async () => {
-    if (!listId || !client) return;
-
-    setLoading(true);
+  const fetchListData = async () => {
     try {
-      // Load group details
-      const { data: groupData, error: groupError } = await supabase
+      setLoading(true);
+      
+      // Fetch contact list details
+      const { data: listData, error: listError } = await supabase
         .from('groups')
         .select('*')
         .eq('id', listId)
-        .eq('client_id', client.id)
         .single();
 
-      if (groupError) throw groupError;
-      setGroup(groupData);
+      if (listError) throw listError;
+      setContactList(listData);
 
-      // Load contacts in this group
+      // Fetch contacts in this list
       const { data: contactsData, error: contactsError } = await supabase
         .from('contacts')
         .select('*')
         .eq('group_id', listId)
-        .eq('client_id', client.id)
         .order('created_at', { ascending: false });
 
       if (contactsError) throw contactsError;
       setContacts(contactsData || []);
-    } catch (error: any) {
+
+    } catch (error) {
+      console.error('Error fetching list data:', error);
       toast({
         title: "Error",
-        description: "Failed to load list and contacts: " + error.message,
-        variant: "destructive",
+        description: "Failed to load contact list data",
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateContact = async () => {
-    if (!client || !listId) return;
-
-    // Basic validation
-    if (!newContact.name.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a contact name",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!newContact.phone.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a phone number",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const contactData = {
-        name: newContact.name.trim(),
-        phone: newContact.phone.trim(),
-        email: newContact.email.trim() || null,
-        tags: newContact.tags ? newContact.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
-        notes: newContact.notes.trim() || null,
-        user_id: client.id,
-        client_id: client.id,
-        group_id: listId
-      };
-
-      const { data: contact, error: contactError } = await supabase
-        .from('contacts')
-        .insert([contactData])
-        .select()
-        .single();
-
-      if (contactError) throw contactError;
-
-      toast({
-        title: "Success",
-        description: "Contact created successfully",
-      });
-
-      setNewContact({ name: '', phone: '', email: '', tags: '', notes: '' });
-      setIsCreateDialogOpen(false);
-      loadGroupAndContacts();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleUpdateContact = async () => {
-    if (!editingContact || !client) return;
-
-    try {
-      const updates = {
-        name: editingContact.name,
-        phone: editingContact.phone,
-        email: editingContact.email || null,
-        tags: editingContact.tags,
-        notes: editingContact.notes || null
-      };
-
-      const { error } = await supabase
-        .from('contacts')
-        .update(updates)
-        .eq('id', editingContact.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Contact updated successfully",
-      });
-
-      setEditingContact(null);
-      loadGroupAndContacts();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteContact = async (id: string) => {
-    try {
-      const { error } = await supabase
-        .from('contacts')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Contact deleted successfully",
-      });
-
-      loadGroupAndContacts();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+    if (file && file.type === 'text/csv') {
+      setCsvFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setCsvContent(e.target?.result as string);
+      };
+      reader.readAsText(file);
+    } else {
       toast({
         title: "Error",
         description: "Please select a valid CSV file",
-        variant: "destructive",
+        variant: "destructive"
       });
-      return;
     }
-
-    setCsvFile(file);
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
-      setCsvContent(content);
-    };
-    reader.readAsText(file);
   };
 
   const handleImportCSV = async () => {
-    if (!client || !csvContent.trim() || !listId) return;
+    if (!csvContent || !listId) return;
 
-    setImporting(true);
     try {
-      const { data, error } = await supabase.rpc('import_contacts_from_csv', {
+      // Get the client_id from the contact list
+      const { data: listData } = await supabase
+        .from('groups')
+        .select('client_id')
+        .eq('id', listId)
+        .single();
+
+      if (!listData?.client_id) {
+        throw new Error('Could not find client for this list');
+      }
+
+      const { error } = await supabase.rpc('import_contacts_from_csv', {
         csv_data: csvContent,
         group_id: listId,
-        client_id: client.id
+        p_client_id: listData.client_id
       });
 
       if (error) throw error;
 
       toast({
-        title: "Import Complete",
-        description: `Successfully imported ${data.inserted_count} contacts. ${data.error_count} errors.`,
-        duration: 5000,
+        title: "Success",
+        description: "Contacts imported successfully"
       });
 
-      setCsvContent('');
+      setShowImportDialog(false);
       setCsvFile(null);
-      setIsImportDialogOpen(false);
-      loadGroupAndContacts();
-    } catch (error: any) {
+      setCsvContent('');
+      fetchListData(); // Refresh the contacts
+    } catch (error) {
+      console.error('Error importing contacts:', error);
       toast({
-        title: "Import Error",
-        description: error.message,
-        variant: "destructive",
+        title: "Error",
+        description: "Failed to import contacts",
+        variant: "destructive"
       });
-    } finally {
-      setImporting(false);
     }
   };
 
   const handleExportCSV = async () => {
-    if (!client || !listId) return;
-
     try {
       const { data, error } = await supabase.rpc('export_contacts_to_csv', {
         group_id: listId,
-        client_id: client.id
+        client_id: contactList?.client_id
       });
 
       if (error) throw error;
@@ -291,51 +182,50 @@ const ListContacts = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `contacts_${group?.name}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `${contactList?.name || 'contacts'}.csv`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
 
       toast({
-        title: "Export Complete",
-        description: "Contacts exported successfully",
+        title: "Success",
+        description: "Contacts exported successfully"
       });
-    } catch (error: any) {
+    } catch (error) {
+      console.error('Error exporting contacts:', error);
       toast({
-        title: "Export Error",
-        description: error.message,
-        variant: "destructive",
+        title: "Error",
+        description: "Failed to export contacts",
+        variant: "destructive"
       });
     }
   };
 
-  const filteredContacts = contacts.filter(contact => {
-    const matchesSearch = 
-      contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.phone.includes(searchTerm) ||
-      contact.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    return matchesSearch;
-  });
+  const filteredContacts = contacts.filter(contact =>
+    contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    contact.phone.includes(searchTerm) ||
+    contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  if (!group) {
+  if (!contactList) {
     return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-medium mb-2">List not found</h3>
-        <Button onClick={() => navigate('/contacts')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Contacts
-        </Button>
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Contact list not found</h2>
+          <Button onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
       </div>
     );
   }
@@ -343,366 +233,201 @@ const ListContacts = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-success via-success/90 to-success/80 -mx-6 -mt-6 px-6 py-8 text-white">
-        <div className="flex items-center gap-3 mb-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate('/contacts')}
-            className="text-white hover:bg-white/20"
-          >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Contacts
+            Back
           </Button>
-          <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
-            <Users className="h-6 w-6 text-white" />
-          </div>
           <div>
-            <h2 className="text-3xl font-bold">{group.name}</h2>
-            {group.description && (
-              <p className="text-white/90 text-lg">{group.description}</p>
-            )}
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+              {contactList.name}
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              {contactList.description}
+            </p>
           </div>
-        </div>
-        <div className="flex items-center gap-4 text-white/90">
-          <span className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            {contacts.length} contacts
-          </span>
-          <span className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            {contacts.filter(c => c.email).length} with email
-          </span>
-        </div>
-      </div>
-
-      {/* Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search contacts in this list..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
         </div>
         
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            onClick={() => setIsImportDialogOpen(true)}
-          >
-            <Import className="h-4 w-4 mr-2" />
-            Import CSV
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleExportCSV}
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-success to-success/80 hover:from-success/90 hover:to-success/70">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Contact
+              <Button variant="outline">
+                <Upload className="h-4 w-4 mr-2" />
+                Import CSV
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add New Contact to {group.name}</DialogTitle>
+                <DialogTitle>Import Contacts from CSV</DialogTitle>
                 <DialogDescription>
-                  Create a new contact in this list
+                  Upload a CSV file with contact information. The file should have columns: name, phone, email (optional)
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Full Name *</Label>
-                  <Input
-                    id="name"
-                    value={newContact.name}
-                    onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-                    placeholder="Enter full name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    value={newContact.phone}
-                    onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-                    placeholder="+1234567890"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email Address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={newContact.email}
-                    onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                    placeholder="email@example.com"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="tags">Tags (comma-separated)</Label>
-                  <Input
-                    id="tags"
-                    value={newContact.tags}
-                    onChange={(e) => setNewContact({ ...newContact, tags: e.target.value })}
-                    placeholder="customer, vip, lead"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea
-                    id="notes"
-                    value={newContact.notes}
-                    onChange={(e) => setNewContact({ ...newContact, notes: e.target.value })}
-                    placeholder="Add any notes about this contact..."
-                    rows={3}
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
+                <Input
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                />
+                {csvContent && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Preview:</p>
+                    <div className="max-h-40 overflow-y-auto bg-muted p-2 rounded text-sm">
+                      <pre>{csvContent}</pre>
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Button onClick={handleImportCSV} disabled={!csvContent}>
+                    Import
                   </Button>
-                  <Button onClick={handleCreateContact}>
-                    Create Contact
+                  <Button variant="outline" onClick={() => setShowImportDialog(false)}>
+                    Cancel
                   </Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
+          
+          <Button variant="outline" onClick={handleExportCSV}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Contact
+          </Button>
         </div>
       </div>
 
-      {/* Contacts Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredContacts.map((contact) => (
-          <Card key={contact.id} className="card-enhanced hover-lift">
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-lg">{contact.name}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{contact.phone}</p>
-                  {contact.email && (
-                    <p className="text-sm text-muted-foreground">{contact.email}</p>
-                  )}
+      {/* Stats */}
+      <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            Contact List Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">{contacts.length}</div>
+              <div className="text-sm text-muted-foreground">Total Contacts</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">
+                {contacts.filter(c => c.email).length}
+              </div>
+              <div className="text-sm text-muted-foreground">With Email</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">
+                {contacts.filter(c => c.tags && c.tags.length > 0).length}
+              </div>
+              <div className="text-sm text-muted-foreground">Tagged</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">
+                {new Date(contactList.created_at).toLocaleDateString()}
+              </div>
+              <div className="text-sm text-muted-foreground">Created</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Search */}
+      <div className="flex gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search contacts..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
+      {/* Contacts List */}
+      <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-primary" />
+            Contacts ({filteredContacts.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {filteredContacts.map((contact) => (
+              <div key={contact.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <h3 className="font-semibold">{contact.name}</h3>
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Phone className="h-3 w-3" />
+                          {contact.phone}
+                        </span>
+                        {contact.email && (
+                          <span className="flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
+                            {contact.email}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(contact.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    {contact.tags && contact.tags.length > 0 && (
+                      <div className="flex gap-1">
+                        {contact.tags.slice(0, 2).map((tag, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                        {contact.tags.length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{contact.tags.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditingContact(contact)}
-                  >
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm">
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteContact(contact.id)}
-                  >
+                  <Button variant="destructive" size="sm">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent>
-              {contact.tags.length > 0 && (
-                <div className="mb-3">
-                  <div className="flex flex-wrap gap-1">
-                    {contact.tags.map(tag => (
-                      <Badge key={tag} variant="secondary" className="text-xs">
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {contact.notes && (
-                <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                  {contact.notes}
-                </p>
-              )}
-              <div className="text-xs text-muted-foreground">
-                Added {new Date(contact.created_at).toLocaleDateString()}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {filteredContacts.length === 0 && (
-        <div className="text-center py-12">
-          <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No contacts found</h3>
-          <p className="text-muted-foreground mb-4">
-            {searchTerm 
-              ? 'Try adjusting your search criteria' 
-              : 'Add your first contact to this list'}
-          </p>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add First Contact
-          </Button>
-        </div>
-      )}
-
-      {/* Import CSV Dialog */}
-      <Dialog open={isImportDialogOpen} onOpenChange={(open) => {
-        setIsImportDialogOpen(open);
-        if (!open) {
-          // Reset import state when dialog is closed
-          setCsvFile(null);
-          setCsvContent('');
-        }
-      }}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Import Contacts to {group.name}</DialogTitle>
-            <DialogDescription>
-              Upload a CSV file to import contacts into this list. The file should have columns: name, phone, email, tags, notes
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="csv-file">CSV File</Label>
-              <div className="mt-2">
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="csv-file"
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => document.getElementById('csv-file')?.click()}
-                  className="w-full"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Choose CSV File
-                </Button>
-              </div>
-              {csvFile && (
-                <div className="mt-2 flex items-center gap-2 p-2 bg-muted rounded">
-                  <span className="text-sm">{csvFile.name}</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setCsvFile(null);
-                      setCsvContent('');
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
+            ))}
             
-            {csvContent && (
-              <div>
-                <Label>Preview (first 5 rows)</Label>
-                <div className="mt-2 p-3 bg-muted rounded text-sm font-mono max-h-32 overflow-y-auto">
-                  {csvContent.split('\n').slice(0, 6).join('\n')}
-                </div>
+            {filteredContacts.length === 0 && (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">
+                  {searchTerm ? 'No contacts found' : 'No contacts in this list'}
+                </h3>
+                <p className="text-muted-foreground">
+                  {searchTerm ? 'Try adjusting your search terms' : 'Add some contacts to get started'}
+                </p>
               </div>
             )}
-
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleImportCSV} 
-                disabled={!csvContent.trim() || importing}
-              >
-                {importing ? 'Importing...' : 'Import Contacts'}
-              </Button>
-            </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Contact Dialog */}
-      <Dialog open={!!editingContact} onOpenChange={() => setEditingContact(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Contact</DialogTitle>
-            <DialogDescription>
-              Update contact information
-            </DialogDescription>
-          </DialogHeader>
-          {editingContact && (
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="edit-name">Full Name *</Label>
-                <Input
-                  id="edit-name"
-                  value={editingContact.name}
-                  onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
-                  placeholder="Enter full name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-phone">Phone Number *</Label>
-                <Input
-                  id="edit-phone"
-                  value={editingContact.phone}
-                  onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })}
-                  placeholder="+1234567890"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-email">Email Address</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editingContact.email || ''}
-                  onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })}
-                  placeholder="email@example.com"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-tags">Tags</Label>
-                <Input
-                  id="edit-tags"
-                  value={editingContact.tags.join(', ')}
-                  onChange={(e) => setEditingContact({ 
-                    ...editingContact, 
-                    tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
-                  })}
-                  placeholder="customer, vip, lead"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-notes">Notes</Label>
-                <Textarea
-                  id="edit-notes"
-                  value={editingContact.notes || ''}
-                  onChange={(e) => setEditingContact({ ...editingContact, notes: e.target.value })}
-                  placeholder="Add any notes about this contact..."
-                  rows={3}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditingContact(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleUpdateContact}>
-                  Update Contact
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
     </div>
   );
-};
-
-export default ListContacts; 
+} 
