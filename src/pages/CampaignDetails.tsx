@@ -114,10 +114,10 @@ export default function CampaignDetails() {
         campaignData = campaignData2;
       }
 
-      // Get contact count
+      // Get contact count using direct relationship
       const { count: contactCount, error: countError } = await supabase
-        .from('contact_groups')
-        .select('*', { count: 'exact' })
+        .from('contacts')
+        .select('*', { count: 'exact', head: true })
         .eq('group_id', campaignData.group_id);
 
       if (countError) {

@@ -91,11 +91,11 @@ export const useCampaignReports = () => {
 
       if (campaignsError) throw campaignsError;
 
-      // Get contact counts for each campaign
+      // Get contact counts for each campaign using direct relationship
       const campaignsWithContactCount = await Promise.all((campaignsData || []).map(async (campaign) => {
         const { count: contactCount, error: countError } = await supabase
-          .from('contact_groups')
-          .select('*', { count: 'exact' })
+          .from('contacts')
+          .select('*', { count: 'exact', head: true })
           .eq('group_id', campaign.group_id);
 
         if (countError) {
@@ -110,6 +110,7 @@ export const useCampaignReports = () => {
         };
       }));
 
+      console.log('Loaded campaigns with contact counts:', campaignsWithContactCount);
       setCampaigns(campaignsWithContactCount);
     } catch (error: any) {
       console.error('Error loading campaigns:', error);
@@ -154,20 +155,26 @@ export const useCampaignReports = () => {
       }
 
       // Format dates for the API (YYYY-MM-DD HH:MM:SS format)
-      const now = new Date();
-      const fromDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} 00:00:00`;
-      const toDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} 23:59:59`;
+      // Use a more targeted date range around when the campaign was sent
+      const campaignCreatedTime = new Date(campaign.created_at);
+      const fromDate = new Date(campaignCreatedTime.getTime() - (30 * 60 * 1000)); // 30 minutes before campaign
+      const toDate = new Date(campaignCreatedTime.getTime() + (30 * 60 * 1000));   // 30 minutes after campaign
+      
+      const fromDateStr = `${fromDate.getFullYear()}-${String(fromDate.getMonth() + 1).padStart(2, '0')}-${String(fromDate.getDate()).padStart(2, '0')} ${String(fromDate.getHours()).padStart(2, '0')}:${String(fromDate.getMinutes()).padStart(2, '0')}:${String(fromDate.getSeconds()).padStart(2, '0')}`;
+      const toDateStr = `${toDate.getFullYear()}-${String(toDate.getMonth() + 1).padStart(2, '0')}-${String(toDate.getDate()).padStart(2, '0')} ${String(toDate.getHours()).padStart(2, '0')}:${String(toDate.getMinutes()).padStart(2, '0')}:${String(toDate.getSeconds()).padStart(2, '0')}`;
 
       const requestBody = {
         userId: client.user_id || client.id,
-        fromDate: fromDate,
-        toDate: toDate,
+        fromDate: fromDateStr,
+        toDate: toDateStr,
         mobileNo: '',
         pageLimit: expectedMessageCount,
         startCursor: '1'
       };
 
       console.log('Campaign Reports API Request Body:', requestBody);
+      console.log(`Fetching reports for campaign "${campaign.name}" between ${fromDateStr} and ${toDateStr}`);
+      console.log(`Campaign was created at: ${campaign.created_at}`);
 
       const response = await fetch('http://localhost:3001/api/fetch-reports', {
         method: 'POST',
@@ -199,25 +206,41 @@ export const useCampaignReports = () => {
         console.log(`Got ${latestMessages.length} messages for campaign ${campaign.name}`);
 
         // Update the campaign with the reports data
-        const { error: updateError } = await supabase
+        console.log(`Updating campaign ${campaign.id} with reports data...`);
+        console.log('Data to update:', { reports_data: latestMessages, updated_at: new Date().toISOString() });
+        
+        const { data: updateData, error: updateError } = await supabase
           .from('campaigns')
           .update({ 
             reports_data: latestMessages,
             updated_at: new Date().toISOString()
           })
-          .eq('id', campaign.id);
+          .eq('id', campaign.id)
+          .select('id, name, reports_data, updated_at');
 
         if (updateError) {
           console.error('Error updating campaign with reports data:', updateError);
           throw updateError;
         }
 
+        console.log(`Successfully updated campaign ${campaign.id} with reports data:`, updateData);
+
         // Update local state
-        setCampaigns(prev => prev.map(c => 
-          c.id === campaign.id 
-            ? { ...c, reports_data: latestMessages }
-            : c
-        ));
+        setCampaigns(prev => {
+          const updated = prev.map(c => 
+            c.id === campaign.id 
+              ? { ...c, reports_data: latestMessages, updated_at: new Date().toISOString() }
+              : c
+          );
+          console.log('Updated campaigns state:', updated);
+          return updated;
+        });
+
+        // Force a refresh of the campaigns data to ensure UI is up to date
+        setTimeout(() => {
+          console.log('Forcing refresh of campaigns data after report update...');
+          loadCampaigns();
+        }, 1000);
 
         toast({
           title: "Success",
@@ -226,7 +249,23 @@ export const useCampaignReports = () => {
 
         return latestMessages;
       } else {
-        throw new Error(data.error || 'Failed to fetch campaign reports');
+        // If no records found, this might be because messages are still being processed
+        // Check if this is a recent campaign (within last 10 minutes)
+        const campaignCreatedTime = new Date(campaign.created_at).getTime();
+        const timeSinceCreation = now.getTime() - campaignCreatedTime;
+        const tenMinutesInMs = 10 * 60 * 1000;
+        
+        if (timeSinceCreation < tenMinutesInMs) {
+          console.log(`Campaign ${campaign.name} was created recently (${Math.round(timeSinceCreation / 60000)} minutes ago). Reports may not be available yet.`);
+          toast({
+            title: "Reports Not Ready",
+            description: `Reports for campaign "${campaign.name}" are not available yet. Please wait a few minutes and try again.`,
+            variant: "default",
+          });
+          return null;
+        } else {
+          throw new Error(data.error || 'Failed to fetch campaign reports');
+        }
       }
     } catch (error: any) {
       console.error('Error fetching campaign reports:', error);
@@ -237,49 +276,60 @@ export const useCampaignReports = () => {
       });
       throw error;
     }
-  }, [client, toast]);
+  }, [client, toast, loadCampaigns]);
 
   // Monitor campaigns for status changes and automatically fetch reports
   const monitorCampaignStatus = useCallback(async () => {
-    if (!client?.id) return;
+    if (!client?.id) {
+      console.log('No client ID available for monitoring campaigns');
+      return;
+    }
 
     try {
-      // Get campaigns that are marked as 'sent' but don't have reports_data yet
-      const { data: sentCampaigns, error } = await supabase
+      console.log('Monitoring campaign status for client:', client.id);
+      
+      // Get campaigns that need reports:
+      // 1. Campaigns marked as 'sent' but don't have reports_data yet
+      // 2. Campaigns marked as 'sending' but have sent_count > 0 (completed sending) and don't have reports_data
+      let { data: campaignsNeedingReports, error } = await supabase
         .from('campaigns')
         .select('*')
-        .eq('status', 'sent')
         .is('reports_data', null)
-        .eq('client_id', client.id);
+        .or(`client_id.eq.${client.id},user_id.eq.${client.id}`)
+        .or('status.eq.sent,status.eq.sending')
+        .not('sent_count', 'eq', 0);
 
       if (error) {
-        console.error('Error fetching sent campaigns:', error);
+        console.error('Error fetching campaigns needing reports:', error);
         return;
       }
 
-      // If no campaigns found with client_id, try user_id
-      let campaignsToProcess = sentCampaigns;
-      if (!sentCampaigns || sentCampaigns.length === 0) {
-        const { data: sentCampaigns2, error: error2 } = await supabase
-          .from('campaigns')
-          .select('*')
-          .eq('status', 'sent')
-          .is('reports_data', null)
-          .eq('user_id', client.id);
-
-        if (error2) {
-          console.error('Error fetching sent campaigns with user_id:', error2);
-          return;
+      // Filter to only include campaigns that actually need reports
+      const campaignsToProcess = campaignsNeedingReports?.filter(campaign => {
+        // Skip campaigns that are too recent (within last 5 minutes)
+        const campaignCreatedTime = new Date(campaign.created_at).getTime();
+        const timeSinceCreation = Date.now() - campaignCreatedTime;
+        const fiveMinutesInMs = 5 * 60 * 1000;
+        
+        if (timeSinceCreation < fiveMinutesInMs) {
+          console.log(`Campaign ${campaign.name} is too recent (${Math.round(timeSinceCreation / 60000)} minutes ago). Skipping for now.`);
+          return false;
         }
-        campaignsToProcess = sentCampaigns2;
-      }
+        
+        // Only include campaigns that have sent messages but no reports
+        return campaign.sent_count > 0 && (!campaign.reports_data || campaign.reports_data.length === 0);
+      }) || [];
 
-      if (campaignsToProcess && campaignsToProcess.length > 0) {
-        console.log(`Found ${campaignsToProcess.length} sent campaigns without reports data`);
+      console.log(`Found ${campaignsToProcess.length} campaigns needing reports:`, campaignsToProcess);
+
+      if (campaignsToProcess.length > 0) {
+        console.log(`Processing ${campaignsToProcess.length} campaigns for reports...`);
         
         // Process each campaign
         for (const campaign of campaignsToProcess) {
           try {
+            console.log(`Fetching reports for campaign: ${campaign.name} (${campaign.id}) - Status: ${campaign.status}, Sent: ${campaign.sent_count}`);
+            
             await fetchCampaignReports(campaign);
             // Add a small delay between API calls to avoid rate limiting
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -287,6 +337,8 @@ export const useCampaignReports = () => {
             console.error(`Failed to fetch reports for campaign ${campaign.id}:`, error);
           }
         }
+      } else {
+        console.log('No campaigns found that need reports fetching');
       }
     } catch (error) {
       console.error('Error monitoring campaign status:', error);
@@ -296,13 +348,72 @@ export const useCampaignReports = () => {
   // Load campaigns on mount
   useEffect(() => {
     loadCampaigns();
-  }, [loadCampaigns]);
+    
+    // Test if client can update campaigns table
+    if (client?.id) {
+      console.log('Testing client permissions for campaigns table...');
+      // Try to update a test field to see if there are permission issues
+      supabase
+        .from('campaigns')
+        .select('id, name')
+        .eq('client_id', client.id)
+        .limit(1)
+        .single()
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Error testing client permissions:', error);
+          } else if (data) {
+            console.log('Client can read campaigns, testing update permissions...');
+            // Try a simple update to test permissions
+            supabase
+              .from('campaigns')
+              .update({ updated_at: new Date().toISOString() })
+              .eq('id', data.id)
+              .then(({ error: updateError }) => {
+                if (updateError) {
+                  console.error('Error testing update permissions:', updateError);
+                } else {
+                  console.log('Client can update campaigns table successfully');
+                }
+              });
+          }
+        });
+    }
+  }, [loadCampaigns, client]);
 
-  // Monitor campaign status every 30 seconds
+  // Monitor campaign status every 20 seconds
   useEffect(() => {
-    const interval = setInterval(monitorCampaignStatus, 30000);
+    console.log('Setting up campaign monitoring interval (20 seconds)');
+    
+    // Run immediately on mount
+    monitorCampaignStatus();
+    
+    const interval = setInterval(() => {
+      console.log('Campaign monitoring interval triggered');
+      monitorCampaignStatus();
+    }, 20000);
     return () => clearInterval(interval);
   }, [monitorCampaignStatus]);
+
+  // Debug: Monitor campaigns state changes
+  useEffect(() => {
+    console.log('Campaigns state changed:', campaigns.length, 'campaigns');
+    campaigns.forEach(c => {
+      if (c.reports_data) {
+        console.log(`Campaign ${c.name} has ${c.reports_data.length} reports`);
+      }
+    });
+  }, [campaigns]);
+
+  // Debug: Monitor campaigns state changes
+  useEffect(() => {
+    console.log('Campaigns state changed:', campaigns.length, 'campaigns');
+    campaigns.forEach(c => {
+      if (c.reports_data) {
+        console.log(`Campaign ${c.name} has ${c.reports_data.length} reports`);
+      }
+    });
+  }, [campaigns]);
 
   return {
     campaigns,

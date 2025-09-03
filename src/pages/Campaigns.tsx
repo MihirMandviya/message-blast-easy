@@ -226,12 +226,13 @@ export default function Campaigns() {
 
       if (groupsError) throw groupsError;
 
-      // Get contact counts for each group using the junction table
+      // Get contact counts for each group using the direct relationship
       const groupsWithCount = await Promise.all((groupsData || []).map(async (group) => {
         const { count: contactCount, error: countError } = await supabase
-          .from('contact_groups')
-          .select('*', { count: 'exact' })
-          .eq('group_id', group.id);
+          .from('contacts')
+          .select('*', { count: 'exact', head: true })
+          .eq('group_id', group.id)
+          .eq('client_id', client?.id);
 
         if (countError) {
           console.error(`Error counting contacts for group ${group.id}:`, countError);
@@ -312,9 +313,10 @@ export default function Campaigns() {
 
       // Check if the selected group has contacts
       const { data: actualContacts, error: contactCountError, count: contactCount } = await supabase
-        .from('contact_groups')
-        .select('contact_id', { count: 'exact' })
-        .eq('group_id', formData.group_id);
+        .from('contacts')
+        .select('*', { count: 'exact', head: true })
+        .eq('group_id', formData.group_id)
+        .eq('client_id', client?.id);
 
       const actualContactCount = contactCount || 0;
 
@@ -789,26 +791,27 @@ export default function Campaigns() {
       console.log('=== LOADING CONTACT GROUPS ===');
       console.log('Group ID:', campaign.group_id);
 
-      // Get contacts from the target group using junction table
-      const { data: contactGroups, error: contactGroupsError } = await supabase
-        .from('contact_groups')
-        .select('contact_id')
-        .eq('group_id', campaign.group_id);
+      // Get contacts directly from the target group
+      const { data: contacts, error: contactsError } = await supabase
+        .from('contacts')
+        .select('*')
+        .eq('group_id', campaign.group_id)
+        .eq('client_id', client?.id);
 
-      if (contactGroupsError) {
-        console.error('Contact groups error:', contactGroupsError);
+      if (contactsError) {
+        console.error('Contacts error:', contactsError);
         toast({
           title: "Error",
-          description: "Failed to load contact groups",
+          description: "Failed to load contacts",
           variant: "destructive",
         });
         return;
       }
 
-      console.log('Contact groups found:', contactGroups?.length || 0);
-      console.log('Contact group IDs:', contactGroups?.map(cg => cg.contact_id) || []);
+      console.log('Contacts loaded successfully:', contacts?.length || 0);
+      console.log('Contact details:', contacts?.map(c => ({ id: c.id, phone: c.phone, name: c.name })) || []);
 
-      if (!contactGroups || contactGroups.length === 0) {
+      if (!contacts || contacts.length === 0) {
         toast({
           title: "No Contacts",
           description: "No contacts found in the selected group",
@@ -816,18 +819,6 @@ export default function Campaigns() {
         });
         return;
       }
-
-      console.log('=== LOADING CONTACTS ===');
-      const contactIds = contactGroups.map(cg => cg.contact_id);
-      console.log('Contact IDs to fetch:', contactIds);
-      console.log('Client ID filter:', client?.id);
-
-      // Get the actual contact details
-      const { data: contacts, error: contactsError } = await supabase
-        .from('contacts')
-        .select('*')
-        .in('id', contactIds)
-        .eq('client_id', client?.id);
 
 
       if (contactsError) {
@@ -1390,36 +1381,12 @@ export default function Campaigns() {
         return;
       }
 
-      // Get all contacts from the target group using junction table
-      const { data: contactGroups, error: contactGroupsError } = await supabase
-        .from('contact_groups')
-        .select('contact_id')
-        .eq('group_id', campaign.group_id);
-
-      if (contactGroupsError) {
-        toast({
-          title: "Error",
-          description: "Failed to load contact groups",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (!contactGroups || contactGroups.length === 0) {
-        toast({
-          title: "No Contacts",
-          description: "No contacts found in the selected group",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Get the actual contact details
-      const contactIds = contactGroups.map(cg => cg.contact_id);
+      // Get all contacts directly from the target group
       const { data: contacts, error: contactsError } = await supabase
         .from('contacts')
         .select('*')
-        .in('id', contactIds);
+        .eq('group_id', campaign.group_id)
+        .eq('client_id', client?.id);
 
       if (contactsError) {
         toast({
@@ -1796,7 +1763,7 @@ export default function Campaigns() {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => window.location.href = '/contact-management'}
+                      onClick={() => navigate('/contacts')}
                       className="text-amber-700 border-amber-300 hover:bg-amber-100"
                     >
                       <Users className="h-3 w-3 mr-1" />

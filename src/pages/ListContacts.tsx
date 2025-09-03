@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { useAdminAuth } from '@/hooks/useAdminAuth';
+import { useClientAuth } from '@/hooks/useClientAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   ArrowLeft,
@@ -53,7 +53,7 @@ export default function ListContacts() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { admin } = useAdminAuth();
+  const { client } = useClientAuth();
   
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactList, setContactList] = useState<ContactList | null>(null);
@@ -62,6 +62,8 @@ export default function ListContacts() {
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvContent, setCsvContent] = useState('');
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [deletingContact, setDeletingContact] = useState<string | null>(null);
 
   // Get clientId from URL params if available
   const clientId = searchParams.get('clientId');
@@ -76,11 +78,16 @@ export default function ListContacts() {
     try {
       setLoading(true);
       
-      // Fetch contact list details
+      if (!client) {
+        throw new Error("Client not authenticated");
+      }
+      
+      // Fetch contact list details - ensure it belongs to the current client
       const { data: listData, error: listError } = await supabase
         .from('groups')
         .select('*')
         .eq('id', listId)
+        .eq('client_id', client.id)
         .single();
 
       if (listError) throw listError;
@@ -91,6 +98,7 @@ export default function ListContacts() {
         .from('contacts')
         .select('*')
         .eq('group_id', listId)
+        .eq('client_id', client.id)
         .order('created_at', { ascending: false });
 
       if (contactsError) throw contactsError;
@@ -202,11 +210,93 @@ export default function ListContacts() {
     }
   };
 
+  const handleUpdateContact = async () => {
+    if (!editingContact || !client) return;
+
+    try {
+      const updates = {
+        name: editingContact.name,
+        phone: editingContact.phone,
+        email: editingContact.email || null,
+        tags: editingContact.tags,
+        notes: editingContact.notes || null
+      };
+
+      const { error } = await supabase
+        .from('contacts')
+        .update(updates)
+        .eq('id', editingContact.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Contact updated successfully",
+      });
+
+      setEditingContact(null);
+      fetchListData(); // Refresh the data
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteContact = async (id: string) => {
+    try {
+      setDeletingContact(id);
+      
+      if (!window.confirm("Are you sure you want to delete this contact? This action cannot be undone.")) {
+        setDeletingContact(null);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Contact deleted successfully",
+      });
+
+      fetchListData(); // Refresh the data
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingContact(null);
+    }
+  };
+
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.phone.includes(searchTerm) ||
     contact.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (!client) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Authentication Required</h2>
+          <p className="text-muted-foreground mb-4">Please log in to access this page.</p>
+          <Button onClick={() => navigate('/auth')}>
+            Go to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -221,9 +311,10 @@ export default function ListContacts() {
       <div className="flex h-screen w-full items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-2">Contact list not found</h2>
-          <Button onClick={() => navigate(-1)}>
+          <p className="text-muted-foreground mb-4">This list may have been deleted or you don't have access to it.</p>
+          <Button onClick={() => navigate('/contacts')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Go Back
+            Back to Contacts
           </Button>
         </div>
       </div>
@@ -401,14 +492,34 @@ export default function ListContacts() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setEditingContact(contact)}
+                    title="View contact details"
+                  >
                     <Eye className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setEditingContact(contact)}
+                    title="Edit contact"
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4" />
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={() => handleDeleteContact(contact.id)}
+                    disabled={deletingContact === contact.id}
+                    title="Delete contact"
+                  >
+                    {deletingContact === contact.id ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                   </Button>
                 </div>
               </div>
@@ -428,6 +539,80 @@ export default function ListContacts() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Contact Dialog */}
+      <Dialog open={!!editingContact} onOpenChange={() => setEditingContact(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Contact</DialogTitle>
+            <DialogDescription>
+              Update contact information
+            </DialogDescription>
+          </DialogHeader>
+          {editingContact && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Full Name *</label>
+                <Input
+                  value={editingContact.name}
+                  onChange={(e) => setEditingContact({ ...editingContact, name: e.target.value })}
+                  placeholder="Enter full name"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Phone Number *</label>
+                <Input
+                  value={editingContact.phone}
+                  onChange={(e) => setEditingContact({ ...editingContact, phone: e.target.value })}
+                  placeholder="+1234567890"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Email Address</label>
+                <Input
+                  type="email"
+                  value={editingContact.email || ''}
+                  onChange={(e) => setEditingContact({ ...editingContact, email: e.target.value })}
+                  placeholder="email@example.com"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Tags (comma-separated)</label>
+                <Input
+                  value={editingContact.tags ? editingContact.tags.join(', ') : ''}
+                  onChange={(e) => setEditingContact({ 
+                    ...editingContact, 
+                    tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
+                  })}
+                  placeholder="customer, vip, lead"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Notes</label>
+                <textarea
+                  value={editingContact.notes || ''}
+                  onChange={(e) => setEditingContact({ ...editingContact, notes: e.target.value })}
+                  placeholder="Add any notes about this contact..."
+                  rows={3}
+                  className="w-full mt-1 px-3 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditingContact(null)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateContact}>
+                  Update Contact
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 } 

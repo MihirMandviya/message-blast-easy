@@ -63,6 +63,7 @@ const ContactManagement = () => {
   const [showCreateListOption, setShowCreateListOption] = useState(false);
   const [newListForImport, setNewListForImport] = useState({ name: '', description: '' });
   const [creatingListForImport, setCreatingListForImport] = useState(false);
+  const [deletingGroup, setDeletingGroup] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [newContact, setNewContact] = useState({
@@ -101,21 +102,31 @@ const ContactManagement = () => {
     if (!client) return;
 
     try {
-      const { data, error } = await supabase
+      // First get all groups
+      const { data: groupsData, error: groupsError } = await supabase
         .from('groups')
-        .select(`
-          *,
-          contacts(count)
-        `)
+        .select('*')
         .eq('client_id', client.id)
         .order('name');
 
-      if (error) throw error;
+      if (groupsError) throw groupsError;
 
-      const groupsWithCount = data?.map(group => ({
-        ...group,
-        contact_count: group.contacts?.[0]?.count || 0
-      })) || [];
+      // Then get contact counts for each group
+      const groupsWithCount = await Promise.all(
+        (groupsData || []).map(async (group) => {
+          const { count, error: countError } = await supabase
+            .from('contacts')
+            .select('*', { count: 'exact', head: true })
+            .eq('group_id', group.id);
+
+          if (countError) {
+            console.error(`Error counting contacts for group ${group.id}:`, countError);
+            return { ...group, contact_count: 0 };
+          }
+
+          return { ...group, contact_count: count || 0 };
+        })
+      );
 
       setGroups(groupsWithCount);
     } catch (error: any) {
@@ -191,6 +202,44 @@ const ContactManagement = () => {
 
   const handleDeleteGroup = async (groupId: string) => {
     try {
+      setDeletingGroup(groupId);
+      
+      // First, check if there are contacts in this group
+      const { data: contactsInGroup, error: contactsError } = await supabase
+        .from('contacts')
+        .select('id')
+        .eq('group_id', groupId);
+
+      if (contactsError) throw contactsError;
+
+      // Show confirmation dialog with information about contacts
+      let confirmMessage = "Are you sure you want to delete this contact list?";
+      if (contactsInGroup && contactsInGroup.length > 0) {
+        confirmMessage += `\n\n⚠️ WARNING: This list contains ${contactsInGroup.length} contact(s). ALL contacts in this list will be PERMANENTLY DELETED along with the list.`;
+      }
+      confirmMessage += "\n\nThis action cannot be undone.";
+
+      if (!window.confirm(confirmMessage)) {
+        setDeletingGroup(null);
+        return;
+      }
+
+      if (contactsInGroup && contactsInGroup.length > 0) {
+        // Delete all contacts in this group first
+        const { error: deleteContactsError } = await supabase
+          .from('contacts')
+          .delete()
+          .eq('group_id', groupId);
+
+        if (deleteContactsError) throw deleteContactsError;
+
+        toast({
+          title: "Notice",
+          description: `Deleted ${contactsInGroup.length} contacts from the list before deletion.`,
+        });
+      }
+
+      // Now delete the group
       const { error } = await supabase
         .from('groups')
         .delete()
@@ -200,18 +249,23 @@ const ContactManagement = () => {
 
       toast({
         title: "Success",
-        description: "Group deleted successfully",
+        description: "Contact list and all its contacts deleted successfully",
       });
 
       loadGroups();
+      refreshData(); // Refresh contacts to show updated data
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setDeletingGroup(null);
     }
   };
+
+
 
   const handleCreateContact = async () => {
     if (!client) return;
@@ -494,7 +548,7 @@ const ContactManagement = () => {
     if (selectedGroup === 'all') return matchesSearch;
     
     // Filter by group if selected
-    return matchesSearch && contact.groups?.some((group: any) => group.id === selectedGroup);
+    return matchesSearch && contact.group_id === selectedGroup;
   });
 
   if (loading) {
@@ -545,19 +599,19 @@ const ContactManagement = () => {
                   className="pl-10"
                 />
               </div>
-              <Select value={selectedGroup} onValueChange={setSelectedGroup}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="All Lists" />
-                </SelectTrigger>
-                                 <SelectContent>
-                   <SelectItem value="all">All Lists</SelectItem>
-                   {groups.map(group => (
-                     <SelectItem key={group.id} value={group.id}>
-                       {group.name} ({group.contact_count})
-                     </SelectItem>
-                   ))}
-                 </SelectContent>
-              </Select>
+                                                <Select value={selectedGroup} onValueChange={setSelectedGroup}>
+                   <SelectTrigger className="w-48">
+                     <SelectValue placeholder="All Lists" />
+                   </SelectTrigger>
+                                    <SelectContent>
+                     <SelectItem value="all">All Lists</SelectItem>
+                     {groups.map(group => (
+                       <SelectItem key={group.id} value={group.id}>
+                         {group.name} ({group.contact_count})
+                       </SelectItem>
+                     ))}
+                   </SelectContent>
+                  </Select>
             </div>
             
             <div className="flex gap-2">
@@ -798,30 +852,30 @@ const ContactManagement = () => {
             ))}
           </div>
 
-          {filteredContacts.length === 0 && (
-            <div className="text-center py-12">
-              <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No contacts found</h3>
-              <p className="text-muted-foreground mb-4">
-                {searchTerm 
-                  ? 'Try adjusting your search criteria' 
-                  : groups.length === 0 
-                    ? 'You must create a list first before adding contacts'
-                    : 'Add your first contact to get started'}
-              </p>
-              {groups.length === 0 ? (
-                <Button onClick={() => setIsCreateGroupDialogOpen(true)}>
-                  <FolderPlus className="h-4 w-4 mr-2" />
-                  Create First List
-                </Button>
-              ) : (
-                <Button onClick={() => setIsCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add First Contact
-                </Button>
-              )}
-            </div>
-          )}
+                     {filteredContacts.length === 0 && (
+             <div className="text-center py-12">
+               <Users className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+               <h3 className="text-lg font-medium mb-2">No contacts found</h3>
+               <p className="text-muted-foreground mb-4">
+                 {searchTerm 
+                   ? 'Try adjusting your search criteria' 
+                   : groups.length === 0 
+                     ? 'You must create a list first before adding contacts'
+                     : 'Add your first contact to get started'}
+               </p>
+               {groups.length === 0 ? (
+                 <Button onClick={() => setIsCreateGroupDialogOpen(true)}>
+                   <FolderPlus className="h-4 w-4 mr-2" />
+                   Create First List
+                 </Button>
+               ) : (
+                 <Button onClick={() => setIsCreateDialogOpen(true)}>
+                   <Plus className="h-4 w-4 mr-2" />
+                   Add First Contact
+                 </Button>
+               )}
+             </div>
+           )}
         </TabsContent>
 
         <TabsContent value="groups" className="space-y-6">
@@ -878,44 +932,53 @@ const ContactManagement = () => {
             </Dialog>
           </div>
 
-          {/* Groups Grid */}
-                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                     {/* Groups Grid */}
+                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 [&>*]:text-render-optimize">
              {groups.map((group) => (
-               <Card 
-                 key={group.id} 
-                 className="card-enhanced hover-lift cursor-pointer"
-                 onClick={() => navigate(`/contacts/list/${group.id}`)}
-               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{group.name}</CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {group.contact_count || 0} contacts
-                      </p>
-                    </div>
-                                         <div className="flex gap-1">
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           setEditingGroup(group);
-                         }}
-                       >
-                         <Edit className="h-4 w-4" />
-                       </Button>
-                       <Button
-                         variant="ghost"
-                         size="sm"
-                         onClick={(e) => {
-                           e.stopPropagation();
-                           handleDeleteGroup(group.id);
-                         }}
-                       >
-                         <Trash2 className="h-4 w-4" />
-                       </Button>
+                               <Card 
+                  key={group.id} 
+                  className="card-enhanced hover-lift cursor-pointer"
+                  onClick={() => navigate(`/contacts/list/${group.id}`)}
+                >
+                 <CardHeader className="pb-3">
+                   <div className="flex items-center justify-between">
+                     <div className="min-w-0 flex-1 pr-2">
+                       <CardTitle className="text-lg truncate leading-tight antialiased">{group.name}</CardTitle>
+                       <p className="text-sm text-muted-foreground truncate leading-tight antialiased">
+                         {group.contact_count || 0} contacts
+                       </p>
                      </div>
+                                                                                   <div className="flex gap-1 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingGroup(group);
+                          }}
+                          title="Edit list"
+                          className="shrink-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteGroup(group.id);
+                          }}
+                          disabled={deletingGroup === group.id}
+                          className={`shrink-0 ${deletingGroup === group.id ? "opacity-50" : ""}`}
+                          title="Delete list"
+                        >
+                          {deletingGroup === group.id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                   </div>
                 </CardHeader>
                 <CardContent>
