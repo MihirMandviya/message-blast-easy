@@ -114,6 +114,12 @@
         },
         "api/download-media.js": {
           "maxDuration": 60
+        },
+        "api/fetch-reports.js": {
+          "maxDuration": 30
+        },
+        "api/fetch-wallet-balance.js": {
+          "maxDuration": 30
         }
   },
   "env": {

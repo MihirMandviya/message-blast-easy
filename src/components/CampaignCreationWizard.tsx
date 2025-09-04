@@ -31,7 +31,8 @@ import {
   Upload,
   X,
   List,
-  UserPlus
+  UserPlus,
+  Info
 } from "lucide-react";
 
 interface CampaignCreationWizardProps {
@@ -80,6 +81,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
   const [groups, setGroups] = useState<Group[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [media, setMedia] = useState<Media[]>([]);
+  const [availableMedia, setAvailableMedia] = useState<Media[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<Media | null>(null);
@@ -140,6 +142,24 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
       console.log('No client ID found, skipping data fetch');
     }
   }, [client?.id, clientLoading]);
+
+  // Filter templates when contact selection type changes
+  useEffect(() => {
+    if (templates.length > 0) {
+      let filteredTemplates = templates;
+      if (contactSelectionType === 'manual') {
+        // For manual entry, only show templates without variable mappings
+        filteredTemplates = templates.filter(template => {
+          // Check if template has variable mappings (contains {{variable}} patterns)
+          const hasMappings = template.template_body?.includes('{{') || 
+                             template.template_header?.includes('{{') || 
+                             template.template_footer?.includes('{{');
+          return !hasMappings;
+        });
+      }
+      setTemplates(filteredTemplates);
+    }
+  }, [contactSelectionType]);
 
   const fetchData = async () => {
     try {
@@ -362,13 +382,35 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
 
     setCreatingList(true);
     try {
+      // Check if group name already exists
+      const { data: existingGroup, error: checkError } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('name', newListName.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        throw checkError;
+      }
+
+      if (existingGroup) {
+        toast({
+          title: "Error",
+          description: "A contact list with this name already exists. Please choose a different name.",
+          variant: "destructive",
+        });
+        setCreatingList(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('groups')
         .insert({
           name: newListName.trim(),
           description: newListDescription.trim(),
           client_id: client.id,
-          user_id: client.client_id
+          user_id: client.id // Use client.id (client_users.id) for RLS policy
         })
         .select()
         .single();
@@ -380,10 +422,18 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
         description: `Contact list "${newListName}" created successfully!`
       });
 
-      // Refresh groups and select the new one
-      await fetchData();
-      setSelectedGroup(data);
-      setFormData(prev => ({ ...prev, group_id: data.id }));
+      // Create the updated group object with contact count (0 for empty list)
+      const updatedGroup = {
+        ...data,
+        contact_count: 0
+      };
+      
+      // Add the new group to the existing groups list
+      setGroups(prev => [...prev, updatedGroup]);
+      
+      // Select the new group
+      setSelectedGroup(updatedGroup);
+      setFormData(prev => ({ ...prev, group_id: updatedGroup.id }));
       setShowCreateListDialog(false);
       setNewListName('');
       setNewListDescription('');
@@ -433,6 +483,28 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
 
     setCreatingListFromCsv(true);
     try {
+      // Check if group name already exists
+      const { data: existingGroup, error: checkError } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('name', newListName.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        throw checkError;
+      }
+
+      if (existingGroup) {
+        toast({
+          title: "Error",
+          description: "A contact list with this name already exists. Please choose a different name.",
+          variant: "destructive",
+        });
+        setCreatingListFromCsv(false);
+        return;
+      }
+
       // First create the group
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
@@ -440,7 +512,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
           name: newListName.trim(),
           description: newListDescription.trim() || `Created from CSV: ${csvFile?.name}`,
           client_id: client.id,
-          user_id: client.client_id
+          user_id: client.id // Use client.id (client_users.id) for RLS policy
         })
         .select()
         .single();
@@ -448,7 +520,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
       if (groupError) throw groupError;
 
       // Then import contacts from CSV
-      const { data, error } = await supabase.rpc('import_contacts_from_csv', {
+      const { data: result, error } = await supabase.rpc('import_contacts_from_csv_flexible', {
         csv_data: csvContent,
         group_id: groupData.id,
         p_client_id: client.id
@@ -461,10 +533,18 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
         description: `Contact list "${newListName}" created with ${data} contacts from CSV!`
       });
 
-      // Refresh groups and select the new one
-      await fetchData();
-      setSelectedGroup(groupData);
-      setFormData(prev => ({ ...prev, group_id: groupData.id }));
+      // Create the updated group object with contact count
+      const updatedGroup = {
+        ...groupData,
+        contact_count: data || 0
+      };
+      
+      // Add the new group to the existing groups list
+      setGroups(prev => [...prev, updatedGroup]);
+      
+      // Select the new group
+      setSelectedGroup(updatedGroup);
+      setFormData(prev => ({ ...prev, group_id: updatedGroup.id }));
       setShowCreateListDialog(false);
       setNewListName('');
       setNewListDescription('');
@@ -483,81 +563,6 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
     }
   };
 
-  const handleCreateListFromManualContacts = async () => {
-    if (!client || !newListName.trim() || !manualContacts.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a list name and contacts",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setCreatingList(true);
-    try {
-      // First create the group
-      const { data: groupData, error: groupError } = await supabase
-        .from('groups')
-        .insert({
-          name: newListName.trim(),
-          description: newListDescription.trim() || 'Created from manual entry',
-          client_id: client.id,
-          user_id: client.client_id
-        })
-        .select()
-        .single();
-
-      if (groupError) throw groupError;
-
-      // Parse manual contacts (format: name,phone or name,phone,email)
-      const contactLines = manualContacts.split('\n').filter(line => line.trim());
-      const contacts = contactLines.map(line => {
-        const parts = line.split(',').map(part => part.trim());
-        return {
-          name: parts[0] || '',
-          phone: parts[1] || '',
-          email: parts[2] || '',
-          group_id: groupData.id,
-          client_id: client.id,
-          user_id: client.client_id
-        };
-      }).filter(contact => contact.name && contact.phone);
-
-      if (contacts.length === 0) {
-        throw new Error('No valid contacts found. Please ensure each line has at least name and phone number.');
-      }
-
-      // Insert contacts
-      const { error: contactsError } = await supabase
-        .from('contacts')
-        .insert(contacts);
-
-      if (contactsError) throw contactsError;
-
-      toast({
-        title: "Success",
-        description: `Contact list "${newListName}" created with ${contacts.length} contacts!`
-      });
-
-      // Refresh groups and select the new one
-      await fetchData();
-      setSelectedGroup(groupData);
-      setFormData(prev => ({ ...prev, group_id: groupData.id }));
-      setShowCreateListDialog(false);
-      setNewListName('');
-      setNewListDescription('');
-      setManualContacts('');
-
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setCreatingList(false);
-    }
-  };
 
   const getTemplateContent = (template: Template): string => {
     const parts = [];
@@ -635,17 +640,27 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
     try {
       setLoading(true);
 
-      if (!formData.name || !formData.template_id) {
+      if (!formData.name) {
         toast({
           title: "Validation Error",
-          description: "Please fill in all required fields",
+          description: "Please fill in campaign name",
           variant: "destructive",
         });
         return;
       }
 
-      // Check if media is required and selected for media templates
-      if (selectedTemplate?.template_header && (!selectedMedia || !selectedMedia.id)) {
+      // Template is required for all entries
+      if (!formData.template_id) {
+        toast({
+          title: "Validation Error",
+          description: "Please select a template",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Check if media is required and selected for media templates (only for non-manual entries)
+      if (contactSelectionType !== 'manual' && selectedTemplate?.template_header && (!selectedMedia || !selectedMedia.id)) {
         toast({
           title: "Validation Error",
           description: "Please select media for this template",
@@ -686,14 +701,14 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
           return;
         }
       } else if (contactSelectionType === 'manual') {
-        // Create a temporary group for manual contacts
+        // For manual entry, create a temporary group and insert contacts directly
         const { data: tempGroup, error: groupError } = await supabase
           .from('groups')
           .insert({
             name: `${formData.name} - Manual Contacts`,
             description: 'Temporary group for manual contacts',
             client_id: client?.id,
-            user_id: client?.client_id
+            user_id: client?.id
           })
           .select()
           .single();
@@ -701,29 +716,38 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
         if (groupError) throw groupError;
         groupId = tempGroup.id;
 
-        // Parse and insert manual contacts
-        const contactLines = manualContacts.split('\n').filter(line => line.trim());
-        const contacts = contactLines.map(line => {
-          const parts = line.split(',').map(part => part.trim());
-          return {
-            name: parts[0] || '',
-            phone: parts[1] || '',
-            email: parts[2] || '',
-            group_id: groupId,
-            client_id: client?.id,
-            user_id: client?.client_id
-          };
-        }).filter(contact => contact.name && contact.phone);
+        // Parse manual contacts (format: phone numbers only)
+        const phoneNumbers = manualContacts.split(/[,\n]/).map(phone => phone.trim()).filter(phone => phone);
+        
+        // Automatically add +91 if country code is missing
+        const processedPhones = phoneNumbers.map(phone => {
+          if (!phone.startsWith('+')) {
+            // Remove any leading zeros and add +91
+            const cleanPhone = phone.replace(/^0+/, '');
+            return `+91${cleanPhone}`;
+          }
+          return phone;
+        });
+        
+        const contacts = processedPhones.map(phone => ({
+          name: '', // No name for manual entry
+          phone: phone,
+          email: null, // No email for manual entry
+          group_id: groupId,
+          client_id: client?.id,
+          user_id: client?.id
+        }));
 
         if (contacts.length === 0) {
           toast({
             title: "Validation Error",
-            description: "No valid contacts found. Please ensure each line has at least name and phone number.",
+            description: "No valid phone numbers found. Please enter at least one phone number.",
             variant: "destructive",
           });
           return;
         }
 
+        // Insert contacts
         const { error: contactsError } = await supabase
           .from('contacts')
           .insert(contacts);
@@ -747,14 +771,14 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
         groupId = tempGroup.id;
 
         // Import contacts from CSV
-        const { data, error } = await supabase.rpc('import_contacts_from_csv', {
+        const { data: result, error } = await supabase.rpc('import_contacts_from_csv_flexible', {
           csv_data: csvContent,
           group_id: groupId,
           p_client_id: client?.id
         });
 
         if (error) throw error;
-        actualContactCount = data;
+        actualContactCount = result?.inserted_count || 0;
       }
 
       // Determine campaign status based on type
@@ -778,9 +802,9 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
         template_id: formData.template_id,
         status: campaignStatus,
         scheduled_for: formData.scheduled_for ? formData.scheduled_for.toISOString() : null,
-        variable_mappings: variableMappings,
-        selected_media_id: selectedMedia?.media_id || null,
-        selected_media_type: selectedMedia?.media_type || null
+        variable_mappings: contactSelectionType === 'manual' ? {} : variableMappings,
+        selected_media_id: contactSelectionType === 'manual' ? null : (selectedMedia?.media_id || null),
+        selected_media_type: contactSelectionType === 'manual' ? null : (selectedMedia?.media_type || null)
       };
 
       const { data, error } = await supabase
@@ -975,15 +999,16 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
               <TabsContent value="manual" className="space-y-4">
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Enter Contacts Manually *</Label>
+                    <Label>Enter Phone Numbers Manually *</Label>
                     <p className="text-sm text-muted-foreground">
-                      Enter contacts one per line in the format: Name, Phone, Email (optional)
+                      Enter phone numbers separated by commas. +91 will be added automatically if not provided
                     </p>
                     <Textarea
-                      placeholder="John Doe, +1234567890, john@example.com&#10;Jane Smith, +0987654321&#10;Bob Johnson, +1122334455, bob@example.com"
+                      placeholder="9876543210&#10;+19123456789&#10;9123456789"
                       value={manualContacts}
                       onChange={(e) => setManualContacts(e.target.value)}
                       rows={8}
+                      className="font-mono text-sm"
                     />
                   </div>
                   
@@ -994,20 +1019,19 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
                         <span className="font-medium">Manual Contacts Preview</span>
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        {manualContacts.split('\n').filter(line => line.trim()).length} contacts will be added
+                        {manualContacts.split(/[,\n]/).filter(phone => phone.trim()).length} contacts will be added
                       </div>
                     </div>
                   )}
                   
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowCreateListDialog(true)}
-                      disabled={!manualContacts.trim()}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create List from Contacts
-                    </Button>
+                  <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+                    <div className="flex items-center gap-2">
+                      <Info className="h-4 w-4 text-blue-600" />
+                      <span className="font-medium text-blue-800">Ready to Proceed</span>
+                    </div>
+                    <p className="text-sm text-blue-700 mt-1">
+                      Your manually entered contacts will be used directly for this campaign. No need to create or select a list.
+                    </p>
                   </div>
                 </div>
               </TabsContent>
@@ -1017,7 +1041,9 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
                   <div className="space-y-2">
                     <Label>Upload CSV File *</Label>
                     <p className="text-sm text-muted-foreground">
-                      Upload a CSV file with columns: name, phone, email, tags, notes
+                      Upload a CSV file. Required column: Contact (phone number). Optional columns: Name, Email, Tags, Notes.
+                      <br />
+                      <strong>Expected format:</strong> Contact, Name, Email, Tags, Notes
                     </p>
                     <div>
                       <input
@@ -1059,7 +1085,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
                     <div className="space-y-2">
                       <Label>CSV Preview (first 5 rows)</Label>
                       <div className="p-3 bg-muted rounded text-sm font-mono max-h-32 overflow-y-auto">
-                        {csvContent.split('\n').slice(0, 6).join('\n')}
+                        <pre className="whitespace-pre-wrap break-words overflow-wrap-anywhere">{csvContent.split('\n').slice(0, 6).join('\n')}</pre>
                       </div>
                     </div>
                   )}
@@ -1500,19 +1526,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
                   Cancel
                 </Button>
                 
-                {contactSelectionType === 'manual' ? (
-                  <Button
-                    onClick={handleCreateListFromManualContacts}
-                    disabled={!newListName.trim() || !manualContacts.trim() || creatingList}
-                  >
-                    {creatingList ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Plus className="h-4 w-4 mr-2" />
-                    )}
-                    Create List
-                  </Button>
-                ) : contactSelectionType === 'csv' ? (
+                {contactSelectionType === 'csv' ? (
                   <Button
                     onClick={handleCreateListFromCsv}
                     disabled={!newListName.trim() || !csvContent.trim() || creatingListFromCsv}

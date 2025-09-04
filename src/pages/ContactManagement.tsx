@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Plus, Edit, Trash2, Search, Mail, Phone, UserPlus, Import, Download, FolderPlus, List, Upload, X } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Search, Mail, Phone, UserPlus, Import, Download, FolderPlus, List, Upload, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useClientData } from '@/hooks/useClientData';
 import { useClientAuth } from '@/hooks/useClientAuth';
@@ -74,6 +74,7 @@ const ContactManagement = () => {
     notes: '',
     groupId: ''
   });
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
 
   const [newGroup, setNewGroup] = useState({
     name: '',
@@ -142,6 +143,27 @@ const ContactManagement = () => {
     if (!client || !newGroup.name.trim()) return;
 
     try {
+      // Check if group name already exists
+      const { data: existingGroup, error: checkError } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('name', newGroup.name.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        throw checkError;
+      }
+
+      if (existingGroup) {
+        toast({
+          title: "Error",
+          description: "A contact list with this name already exists. Please choose a different name.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('groups')
         .insert([{
@@ -325,6 +347,7 @@ const ContactManagement = () => {
 
       setNewContact({ name: '', phone: '', email: '', tags: '', notes: '', groupId: '' });
       setIsCreateDialogOpen(false);
+      setShowOptionalFields(false);
       refreshData();
     } catch (error: any) {
       toast({
@@ -421,6 +444,28 @@ const ContactManagement = () => {
 
     setCreatingListForImport(true);
     try {
+      // Check if group name already exists
+      const { data: existingGroup, error: checkError } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('name', newListForImport.name.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        throw checkError;
+      }
+
+      if (existingGroup) {
+        toast({
+          title: "Error",
+          description: "A contact list with this name already exists. Please choose a different name.",
+          variant: "destructive",
+        });
+        setCreatingListForImport(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('groups')
         .insert([{
@@ -471,7 +516,7 @@ const ContactManagement = () => {
 
     setImporting(true);
     try {
-      const { data, error } = await supabase.rpc('import_contacts_from_csv', {
+      const { data: result, error } = await supabase.rpc('import_contacts_from_csv_flexible', {
         csv_data: csvContent,
         group_id: newContact.groupId,
         p_client_id: client.id
@@ -479,11 +524,19 @@ const ContactManagement = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Import Complete",
-        description: `Successfully imported ${data.inserted_count} contacts. ${data.error_count} errors.`,
-        duration: 5000,
-      });
+      if (result && result.success) {
+        const message = result.inserted_count > 0 
+          ? `Successfully imported ${result.inserted_count} contacts${result.error_count > 0 ? ` (${result.error_count} errors)` : ''}`
+          : 'No contacts were imported';
+        
+        toast({
+          title: "Import Complete",
+          description: message,
+          duration: 5000,
+        });
+      } else {
+        throw new Error(result?.error || 'Import failed');
+      }
 
       setCsvContent('');
       setCsvFile(null);
@@ -503,40 +556,6 @@ const ContactManagement = () => {
     }
   };
 
-  const handleExportCSV = async () => {
-    if (!client) return;
-
-    try {
-      const { data, error } = await supabase.rpc('export_contacts_to_csv', {
-        group_id: selectedGroup !== 'all' ? selectedGroup : null,
-        client_id: client.id
-      });
-
-      if (error) throw error;
-
-      // Create and download CSV file
-      const blob = new Blob([data], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `contacts_${selectedGroup !== 'all' ? groups.find(g => g.id === selectedGroup)?.name : 'all'}_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "Export Complete",
-        description: "Contacts exported successfully",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Export Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
 
   const filteredContacts = contacts.filter(contact => {
     const matchesSearch = 
@@ -623,14 +642,6 @@ const ContactManagement = () => {
                 <Import className="h-4 w-4 mr-2" />
                 Import CSV
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleExportCSV}
-                disabled={groups.length === 0}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Export
-              </Button>
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
                   <Button 
@@ -695,27 +706,56 @@ const ContactManagement = () => {
                         Every contact must belong to a list
                       </p>
                     </div>
-                    <div>
-                      <Label htmlFor="tags">Tags (comma-separated)</Label>
-                      <Input
-                        id="tags"
-                        value={newContact.tags}
-                        onChange={(e) => setNewContact({ ...newContact, tags: e.target.value })}
-                        placeholder="customer, vip, lead"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="notes">Notes</Label>
-                      <Textarea
-                        id="notes"
-                        value={newContact.notes}
-                        onChange={(e) => setNewContact({ ...newContact, notes: e.target.value })}
-                        placeholder="Add any notes about this contact..."
-                        rows={3}
-                      />
+                    {showOptionalFields && (
+                      <>
+                        <div>
+                          <Label htmlFor="tags">Tags (comma-separated)</Label>
+                          <Input
+                            id="tags"
+                            value={newContact.tags}
+                            onChange={(e) => setNewContact({ ...newContact, tags: e.target.value })}
+                            placeholder="customer, vip, lead"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="notes">Notes</Label>
+                          <Textarea
+                            id="notes"
+                            value={newContact.notes}
+                            onChange={(e) => setNewContact({ ...newContact, notes: e.target.value })}
+                            placeholder="Add any notes about this contact..."
+                            rows={3}
+                          />
+                        </div>
+                      </>
+                    )}
+                    
+                    <div className="flex justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowOptionalFields(!showOptionalFields)}
+                        className="flex items-center gap-2"
+                      >
+                        {showOptionalFields ? (
+                          <>
+                            <ChevronUp className="h-4 w-4" />
+                            Hide Optional Fields
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-4 w-4" />
+                            Show Optional Fields
+                          </>
+                        )}
+                      </Button>
                     </div>
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                      <Button variant="outline" onClick={() => {
+                        setIsCreateDialogOpen(false);
+                        setShowOptionalFields(false);
+                      }}>
                         Cancel
                       </Button>
                       <Button onClick={handleCreateContact}>
@@ -1031,7 +1071,9 @@ const ContactManagement = () => {
           <DialogHeader>
             <DialogTitle>Import Contacts from CSV</DialogTitle>
             <DialogDescription>
-              Upload a CSV file to import contacts. The file should have columns: name, phone, email, tags, notes
+              Upload a CSV file to import contacts. Required column: Contact (phone number). Optional columns: Name, Email, Tags, Notes.
+              <br />
+              <strong>Expected format:</strong> Contact, Name, Email, Tags, Notes
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1076,7 +1118,7 @@ const ContactManagement = () => {
               <div>
                 <Label>Preview (first 5 rows)</Label>
                 <div className="mt-2 p-3 bg-muted rounded text-sm font-mono max-h-32 overflow-y-auto">
-                  {csvContent.split('\n').slice(0, 6).join('\n')}
+                  <pre className="whitespace-pre-wrap break-words overflow-wrap-anywhere">{csvContent.split('\n').slice(0, 6).join('\n')}</pre>
                 </div>
               </div>
             )}

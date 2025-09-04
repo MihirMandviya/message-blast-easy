@@ -71,7 +71,7 @@ export const useReports = () => {
 
        console.log('Reports API Request Body:', requestBody);
 
-       const response = await fetch('http://localhost:3001/api/fetch-reports', {
+       const response = await fetch('/api/fetch-reports', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -20,7 +20,7 @@ interface Campaign {
   message_content: string;
   message_type: string;
   target_groups: string[];
-  status: 'draft' | 'scheduled' | 'sending' | 'sent';
+  status: 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed';
   sent_count: number;
   delivered_count: number;
   failed_count: number;
@@ -192,12 +192,11 @@ export default function Campaigns() {
     try {
       setLoading(true);
 
-      // Build query for campaigns - only show completely sent campaigns
+      // Build query for campaigns - show all campaigns
       const { data: campaignsData, error: campaignsError } = await supabase
         .from('campaigns')
         .select('*')
         .eq('client_id', client?.id)
-        .eq('status', 'sent')  // Only show campaigns that are completely sent
         .order('created_at', { ascending: false });
 
       if (campaignsError) throw campaignsError;
@@ -589,17 +588,41 @@ export default function Campaigns() {
 
 
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, failedCount: number = 0) => {
+    // Determine if campaign should be marked as failed
+    const isFailed = status === 'sent' && failedCount > 0;
+    const displayStatus = isFailed ? 'failed' : status;
+    
     const variants = {
       draft: "secondary",
-      scheduled: "default",
-      sending: "secondary",
-      sent: "success"
+      scheduled: "default", 
+      sending: "default",
+      sent: "default",
+      failed: "destructive"
     } as const;
 
+    const colors = {
+      draft: "bg-gray-100 text-gray-800 border-gray-200",
+      scheduled: "bg-blue-100 text-blue-800 border-blue-200",
+      sending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      sent: "bg-green-100 text-green-800 border-green-200",
+      failed: "bg-red-100 text-red-800 border-red-200"
+    };
+
+    const labels = {
+      draft: "Draft",
+      scheduled: "Scheduled",
+      sending: "Sending...",
+      sent: "Sent",
+      failed: "Failed"
+    };
+
     return (
-      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
-        {status === 'sending' ? 'Sending...' : status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge 
+        variant={variants[displayStatus as keyof typeof variants] || "secondary"}
+        className={colors[displayStatus as keyof typeof colors]}
+      >
+        {labels[displayStatus as keyof typeof labels]}
       </Badge>
     );
   };
@@ -939,7 +962,7 @@ export default function Campaigns() {
 
           console.log('Automatic report fetch request:', requestBody);
 
-          const response = await fetch('http://localhost:3001/api/fetch-reports', {
+          const response = await fetch('/api/fetch-reports', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -2024,7 +2047,7 @@ export default function Campaigns() {
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
                         <h3 className="text-lg font-semibold">{campaign.name}</h3>
-                        {getStatusBadge(campaign.status)}
+                        {getStatusBadge(campaign.status, campaign.failed_count)}
                         {campaign.scheduled_for && (
                           <Badge variant="outline" className="text-xs">
                             <Clock className="h-3 w-3 mr-1" />

@@ -74,8 +74,6 @@ export default function CampaignDetails() {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [campaignDisplayTime, setCampaignDisplayTime] = useState<Date | null>(null);
-  const [canFetchReports, setCanFetchReports] = useState(false);
-  const [remainingTime, setRemainingTime] = useState<number>(0);
 
   useEffect(() => {
     if (campaignId && client?.id) {
@@ -83,36 +81,11 @@ export default function CampaignDetails() {
     }
   }, [campaignId, client?.id]);
 
-  // Track when campaign is first displayed and set up delay for fetch reports
+  // Track when campaign is first displayed
   useEffect(() => {
     if (campaign && !campaignDisplayTime) {
       const displayTime = new Date();
       setCampaignDisplayTime(displayTime);
-      
-      // Set up timer to enable fetch reports after 25-30 seconds
-      const delay = Math.random() * 5000 + 25000; // Random delay between 25-30 seconds
-      setRemainingTime(Math.ceil(delay / 1000));
-      
-      const timer = setTimeout(() => {
-        setCanFetchReports(true);
-        setRemainingTime(0);
-      }, delay);
-
-      // Update remaining time every second
-      const interval = setInterval(() => {
-        setRemainingTime(prev => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      return () => {
-        clearTimeout(timer);
-        clearInterval(interval);
-      };
     }
   }, [campaign, campaignDisplayTime]);
 
@@ -326,7 +299,7 @@ export default function CampaignDetails() {
 
       console.log('Refreshing campaign reports with request:', requestBody);
 
-      const response = await fetch('http://localhost:3001/api/fetch-reports', {
+      const response = await fetch('/api/fetch-reports', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -577,11 +550,11 @@ export default function CampaignDetails() {
                  variant="outline"
                  size="sm"
                  onClick={refreshCampaignReports}
-                 disabled={refreshing || !canFetchReports}
+                 disabled={refreshing}
                  className="flex items-center gap-2"
                >
                  <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                 {refreshing ? 'Refreshing...' : !canFetchReports ? `Please wait... (${remainingTime}s)` : 'Refresh Reports'}
+                 {refreshing ? 'Refreshing...' : 'Refresh Reports'}
                </Button>
                <Button
                  variant="outline"
@@ -608,11 +581,11 @@ export default function CampaignDetails() {
                variant="outline"
                size="sm"
                onClick={refreshCampaignReports}
-               disabled={refreshing || !canFetchReports}
+               disabled={refreshing}
                className="flex items-center gap-2"
              >
                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-               {refreshing ? 'Refreshing...' : !canFetchReports ? `Please wait... (${remainingTime}s)` : 'Fetch Reports'}
+               {refreshing ? 'Refreshing...' : 'Fetch Reports'}
              </Button>
            )}
          </div>
@@ -776,12 +749,12 @@ export default function CampaignDetails() {
                </p>
                <Button
                  onClick={refreshCampaignReports}
-                 disabled={refreshing || !canFetchReports}
+                 disabled={refreshing}
                  className="flex items-center gap-3 px-8 py-3"
                  size="lg"
                >
                  <RefreshCw className={`h-6 w-6 ${refreshing ? 'animate-spin' : ''}`} />
-                 {refreshing ? 'Fetching Reports...' : !canFetchReports ? `Please wait... (${remainingTime}s)` : 'Fetch Reports'}
+                 {refreshing ? 'Fetching Reports...' : 'Fetch Reports'}
                </Button>
              </div>
           ) : (

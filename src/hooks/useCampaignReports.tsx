@@ -176,7 +176,7 @@ export const useCampaignReports = () => {
       console.log(`Fetching reports for campaign "${campaign.name}" between ${fromDateStr} and ${toDateStr}`);
       console.log(`Campaign was created at: ${campaign.created_at}`);
 
-      const response = await fetch('http://localhost:3001/api/fetch-reports', {
+      const response = await fetch('/api/fetch-reports', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

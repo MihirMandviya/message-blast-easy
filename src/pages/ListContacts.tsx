@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { useClientAuth } from '@/hooks/useClientAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -61,12 +64,69 @@ export default function ListContacts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvContent, setCsvContent] = useState('');
+  const [csvColumns, setCsvColumns] = useState<string[]>([]);
+  const [columnValidation, setColumnValidation] = useState<{
+    isValid: boolean;
+    missingColumns: string[];
+    message: string;
+  }>({
+    isValid: false,
+    missingColumns: [],
+    message: ''
+  });
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<string | null>(null);
 
   // Get clientId from URL params if available
   const clientId = searchParams.get('clientId');
+
+  // Function to validate column format
+  const validateColumns = (columns: string[]) => {
+    const requiredColumns = ['name', 'phone'];
+    const optionalColumns = ['email', 'tags', 'notes'];
+    const columnMap = new Map<string, string>();
+    
+    // Create a map of lowercase column names to original names
+    columns.forEach(col => {
+      columnMap.set(col.toLowerCase().trim(), col);
+    });
+    
+    const missingRequiredColumns: string[] = [];
+    const foundOptionalColumns: string[] = [];
+    
+    // Check if required columns exist (case-insensitive)
+    requiredColumns.forEach(requiredCol => {
+      if (!columnMap.has(requiredCol)) {
+        missingRequiredColumns.push(requiredCol);
+      }
+    });
+    
+    // Check which optional columns are present
+    optionalColumns.forEach(optionalCol => {
+      if (columnMap.has(optionalCol)) {
+        foundOptionalColumns.push(optionalCol);
+      }
+    });
+    
+    if (missingRequiredColumns.length > 0) {
+      return {
+        isValid: false,
+        missingColumns: missingRequiredColumns,
+        message: `Missing required columns: ${missingRequiredColumns.join(', ')}. Required columns are: Name, Phone`
+      };
+    }
+    
+    const optionalMessage = foundOptionalColumns.length > 0 
+      ? ` Optional columns found: ${foundOptionalColumns.join(', ')}.`
+      : '';
+    
+    return {
+      isValid: true,
+      missingColumns: [],
+      message: `Required columns found.${optionalMessage}`
+    };
+  };
 
   useEffect(() => {
     if (listId) {
@@ -118,17 +178,61 @@ export default function ListContacts() {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file && file.type === 'text/csv') {
+    if (!file) return;
+
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    
+    if (fileExtension === 'csv') {
       setCsvFile(file);
       const reader = new FileReader();
       reader.onload = (e) => {
-        setCsvContent(e.target?.result as string);
+        const content = e.target?.result as string;
+        setCsvContent(content);
+        
+        // Extract column names from first line
+        const columns = content.split('\n')[0].split(',').map(col => col.trim());
+        setCsvColumns(columns);
+        
+        // Validate columns
+        const validation = validateColumns(columns);
+        setColumnValidation(validation);
       };
       reader.readAsText(file);
+    } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+      setCsvFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Convert to CSV format
+          const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+          setCsvContent(csvContent);
+          
+          // Extract column names from first line
+          const columns = csvContent.split('\n')[0].split(',').map(col => col.trim());
+          setCsvColumns(columns);
+          
+          // Validate columns
+          const validation = validateColumns(columns);
+          setColumnValidation(validation);
+        } catch (error) {
+          console.error('Error reading XLSX file:', error);
+          toast({
+            title: "Error",
+            description: "Failed to read XLSX file. Please try again.",
+            variant: "destructive"
+          });
+        }
+      };
+      reader.readAsArrayBuffer(file);
     } else {
       toast({
         title: "Error",
-        description: "Please select a valid CSV file",
+        description: "Please select a valid CSV or XLSX file",
         variant: "destructive"
       });
     }
@@ -136,6 +240,46 @@ export default function ListContacts() {
 
   const handleImportCSV = async () => {
     if (!csvContent || !listId) return;
+
+    // Validate column format
+    if (!columnValidation.isValid) {
+      toast({
+        title: "Error",
+        description: columnValidation.message,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate that Name and Phone data is not empty
+    const lines = csvContent.split('\n').filter(line => line.trim());
+    const headerLine = lines[0];
+    const dataLines = lines.slice(1);
+    
+    const headerColumns = headerLine.split(',').map(col => col.trim().toLowerCase());
+    const nameIndex = headerColumns.indexOf('name');
+    const phoneIndex = headerColumns.indexOf('phone');
+    
+    const invalidRows: number[] = [];
+    
+    dataLines.forEach((line, index) => {
+      const values = line.split(',').map(val => val.trim());
+      const name = values[nameIndex] || '';
+      const phone = values[phoneIndex] || '';
+      
+      if (!name || !phone) {
+        invalidRows.push(index + 2); // +2 because we skip header and arrays are 0-indexed
+      }
+    });
+    
+    if (invalidRows.length > 0) {
+      toast({
+        title: "Error",
+        description: `Name and Phone columns cannot be empty. Invalid rows: ${invalidRows.join(', ')}`,
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
       // Get the client_id from the contact list
@@ -149,7 +293,7 @@ export default function ListContacts() {
         throw new Error('Could not find client for this list');
       }
 
-      const { error } = await supabase.rpc('import_contacts_from_csv', {
+      const { data: result, error } = await supabase.rpc('import_contacts_from_csv_flexible', {
         csv_data: csvContent,
         group_id: listId,
         p_client_id: listData.client_id
@@ -157,14 +301,28 @@ export default function ListContacts() {
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Contacts imported successfully"
-      });
+      if (result && result.success) {
+        const message = result.inserted_count > 0 
+          ? `Successfully imported ${result.inserted_count} contacts${result.error_count > 0 ? ` (${result.error_count} errors)` : ''}`
+          : 'No contacts were imported';
+        
+        toast({
+          title: "Import Complete",
+          description: message
+        });
+      } else {
+        throw new Error(result?.error || 'Import failed');
+      }
 
       setShowImportDialog(false);
       setCsvFile(null);
       setCsvContent('');
+      setCsvColumns([]);
+      setColumnValidation({
+        isValid: false,
+        missingColumns: [],
+        message: ''
+      });
       fetchListData(); // Refresh the contacts
     } catch (error) {
       console.error('Error importing contacts:', error);
@@ -341,36 +499,69 @@ export default function ListContacts() {
         </div>
         
         <div className="flex gap-2 mt-6">
-          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+          <Dialog open={showImportDialog} onOpenChange={(open) => {
+            setShowImportDialog(open);
+            if (!open) {
+              setCsvFile(null);
+              setCsvContent('');
+              setCsvColumns([]);
+              setColumnValidation({
+                isValid: false,
+                missingColumns: [],
+                message: ''
+              });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Upload className="h-4 w-4 mr-2" />
-                Import CSV
+                Import File
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Import Contacts from CSV</DialogTitle>
+                <DialogTitle>Import Contacts from File</DialogTitle>
                 <DialogDescription>
-                  Upload a CSV file with contact information. The file should have columns: name, phone, email (optional)
+                  Upload a CSV or XLSX file with contact information.
+                  <br />
+                  <strong>Required columns:</strong> Name, Phone (data cannot be empty)
+                  <br />
+                  <strong>Optional columns:</strong> Email, Tags, Notes (can be included or omitted)
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <Input
                   type="file"
-                  accept=".csv"
+                  accept=".csv,.xlsx,.xls"
                   onChange={handleFileUpload}
                 />
-                {csvContent && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Preview:</p>
-                    <div className="max-h-40 overflow-y-auto bg-muted p-2 rounded text-sm">
-                      <pre>{csvContent}</pre>
+                {csvColumns.length > 0 && (
+                  <div className="space-y-4">
+                    <div className="p-3 rounded border">
+                      <p className="text-sm font-medium mb-2">File Validation Status:</p>
+                      <div className={`p-2 rounded text-sm ${
+                        columnValidation.isValid 
+                          ? 'bg-green-50 text-green-800 border border-green-200' 
+                          : 'bg-red-50 text-red-800 border border-red-200'
+                      }`}>
+                        {columnValidation.message}
+                      </div>
+                    </div>
+                    
+                    <div className="p-3 bg-muted rounded">
+                      <p className="text-sm font-medium mb-2">Detected Columns:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {csvColumns.map((col, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {col}
+                          </Badge>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
                 <div className="flex gap-2">
-                  <Button onClick={handleImportCSV} disabled={!csvContent}>
+                  <Button onClick={handleImportCSV} disabled={!csvContent || !columnValidation.isValid}>
                     Import
                   </Button>
                   <Button variant="outline" onClick={() => setShowImportDialog(false)}>
@@ -381,10 +572,12 @@ export default function ListContacts() {
             </DialogContent>
           </Dialog>
           
-          <Button variant="outline" onClick={handleExportCSV}>
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
+          {contacts.length > 0 && (
+            <Button variant="outline" onClick={handleExportCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </Button>
+          )}
           
           <Button>
             <Plus className="h-4 w-4 mr-2" />
