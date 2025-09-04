@@ -1,3 +1,11 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "https://vvpamvhqdyanomqvtmiz.supabase.co";
+// Prefer service role key for server-side operations, fallback to anon key
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cGFtdmhxZHlhbm9tcXZ0bWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2Njc5NTYsImV4cCI6MjA2ODI0Mzk1Nn0.Jq1ek02FHiTOx9m8hQzX9Gh8bmOMzWSJ2YtJIzKg3ZQ";
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 export default async function handler(req, res) {
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,12 +28,22 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Missing required field: userId' });
     }
 
-    // Import Supabase client
-    const { createClient } = require('@supabase/supabase-js');
-    
-    const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://vvpamvhqdyanomqvtmiz.supabase.co";
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cGFtdmhxZHlhbm9tcXZ0bWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2Njc5NTYsImV4cCI6MjA2ODI0Mzk1Nn0.Jq1ek02FHiTOx9m8hQzX9Gh8bmOMzWSJ2YtJIzKg3ZQ";
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Debug logging
+    console.log('Fetching credentials for userId:', userId);
+    console.log('Supabase URL:', supabaseUrl);
+    console.log('Supabase key available:', !!supabaseKey);
+    console.log('Environment variables:', {
+      VITE_SUPABASE_URL: !!process.env.VITE_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      VITE_SUPABASE_ANON_KEY: !!process.env.VITE_SUPABASE_ANON_KEY,
+      SUPABASE_SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    });
+
+    // Test Supabase connection
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return res.status(500).json({ error: 'Database connection failed' });
+    }
 
     // Fetch credentials from database
     const { data: clientData, error: clientError } = await supabase
@@ -34,9 +52,14 @@ export default async function handler(req, res) {
       .eq('user_id', userId)
       .single();
 
+    console.log('Database query result:', { clientData, clientError });
+
     if (clientError || !clientData) {
       console.error('Database error:', clientError?.message || 'Client not found');
-      return res.status(400).json({ error: 'Failed to get client credentials from database' });
+      return res.status(400).json({ 
+        error: 'Failed to get client credentials from database',
+        details: clientError?.message || 'Client not found'
+      });
     }
 
     const { password, whatsapp_number: wabaNumber } = clientData;
