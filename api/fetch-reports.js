@@ -14,11 +14,32 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId, password, wabaNumber, fromDate, toDate, mobileNo, pageLimit, startCursor } = req.body;
+    const { userId, fromDate, toDate, mobileNo, pageLimit, startCursor } = req.body;
 
-    if (!userId || !password || !wabaNumber) {
-      return res.status(400).json({ error: 'Missing required fields: userId, password, wabaNumber' });
+    if (!userId) {
+      return res.status(400).json({ error: 'Missing required field: userId' });
     }
+
+    // Import Supabase client
+    const { createClient } = require('@supabase/supabase-js');
+    
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://vvpamvhqdyanomqvtmiz.supabase.co";
+    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ2cGFtdmhxZHlhbm9tcXZ0bWl6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI2Njc5NTYsImV4cCI6MjA2ODI0Mzk1Nn0.Jq1ek02FHiTOx9m8hQzX9Gh8bmOMzWSJ2YtJIzKg3ZQ";
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Fetch credentials from database
+    const { data: clientData, error: clientError } = await supabase
+      .from('client_users')
+      .select('password, whatsapp_number')
+      .eq('user_id', userId)
+      .single();
+
+    if (clientError || !clientData) {
+      console.error('Database error:', clientError?.message || 'Client not found');
+      return res.status(400).json({ error: 'Failed to get client credentials from database' });
+    }
+
+    const { password, whatsapp_number: wabaNumber } = clientData;
 
     // Create form data
     const formData = new URLSearchParams();
