@@ -248,25 +248,10 @@ export const useCampaignReports = () => {
         });
 
         return latestMessages;
-      } else {
-        // If no records found, this might be because messages are still being processed
-        // Check if this is a recent campaign (within last 10 minutes)
-        const campaignCreatedTime = new Date(campaign.created_at).getTime();
-        const timeSinceCreation = now.getTime() - campaignCreatedTime;
-        const tenMinutesInMs = 10 * 60 * 1000;
-        
-        if (timeSinceCreation < tenMinutesInMs) {
-          console.log(`Campaign ${campaign.name} was created recently (${Math.round(timeSinceCreation / 60000)} minutes ago). Reports may not be available yet.`);
-          toast({
-            title: "Reports Not Ready",
-            description: `Reports for campaign "${campaign.name}" are not available yet. Please wait a few minutes and try again.`,
-            variant: "default",
-          });
-          return null;
-        } else {
-          throw new Error(data.error || 'Failed to fetch campaign reports');
-        }
-      }
+             } else {
+         // If no records found, throw an error
+         throw new Error(data.error || 'Failed to fetch campaign reports');
+       }
     } catch (error: any) {
       console.error('Error fetching campaign reports:', error);
       toast({
@@ -304,21 +289,11 @@ export const useCampaignReports = () => {
         return;
       }
 
-      // Filter to only include campaigns that actually need reports
-      const campaignsToProcess = campaignsNeedingReports?.filter(campaign => {
-        // Skip campaigns that are too recent (within last 5 minutes)
-        const campaignCreatedTime = new Date(campaign.created_at).getTime();
-        const timeSinceCreation = Date.now() - campaignCreatedTime;
-        const fiveMinutesInMs = 5 * 60 * 1000;
-        
-        if (timeSinceCreation < fiveMinutesInMs) {
-          console.log(`Campaign ${campaign.name} is too recent (${Math.round(timeSinceCreation / 60000)} minutes ago). Skipping for now.`);
-          return false;
-        }
-        
-        // Only include campaigns that have sent messages but no reports
-        return campaign.sent_count > 0 && (!campaign.reports_data || campaign.reports_data.length === 0);
-      }) || [];
+             // Filter to only include campaigns that actually need reports
+       const campaignsToProcess = campaignsNeedingReports?.filter(campaign => {
+         // Only include campaigns that have sent messages but no reports
+         return campaign.sent_count > 0 && (!campaign.reports_data || campaign.reports_data.length === 0);
+       }) || [];
 
       console.log(`Found ${campaignsToProcess.length} campaigns needing reports:`, campaignsToProcess);
 

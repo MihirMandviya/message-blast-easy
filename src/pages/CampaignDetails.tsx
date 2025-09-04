@@ -314,17 +314,43 @@ export default function CampaignDetails() {
         return;
       }
 
-      if (response.ok && data.success && data.data.records) {
-        // Simple approach: Sort by submitTime (latest first) and take the first N messages
-        const recentMessages = data.data.records
-          .sort((a: any, b: any) => parseInt(b.submitTime) - parseInt(a.submitTime))
-          .slice(0, campaign.sent_count || campaign.contact_count || 10); // Take exactly the number of messages that were sent
+             if (response.ok && data.success && data.data.records) {
+         // Get the exact number of contacts that were in this campaign
+         const expectedMessageCount = campaign.sent_count || campaign.contact_count || 0;
+         
+         if (expectedMessageCount === 0) {
+           toast({
+             title: "No Contacts",
+             description: "This campaign has no contacts to fetch reports for",
+             variant: "destructive",
+           });
+           return;
+         }
+         
+         // Get campaign creation time to find messages closest to when it was sent
+         const campaignCreatedTime = new Date(campaign.created_at).getTime();
+         
+         // Sort messages by how close they are to the campaign sent time
+         const messagesWithTimeDiff = data.data.records.map((msg: any) => {
+           const msgTime = parseInt(msg.submitTime);
+           const timeDiff = Math.abs(msgTime - campaignCreatedTime);
+           return { ...msg, timeDiff };
+         });
+         
+         // Sort by time difference (closest to campaign time first)
+         messagesWithTimeDiff.sort((a: any, b: any) => a.timeDiff - b.timeDiff);
+         
+         // Take only the exact number of messages that were sent in this campaign
+         const recentMessages = messagesWithTimeDiff.slice(0, expectedMessageCount);
 
-        console.log(`Got ${recentMessages.length} latest messages for campaign ${campaign.id} from ${data.data.records.length} total messages`);
-        console.log('Message timestamps:', recentMessages.map((msg: any) => {
-          const msgTime = parseInt(msg.submitTime);
-          return `${new Date(msgTime).toISOString()} (${msgTime})`;
-        }));
+                 console.log(`Campaign "${campaign.name}" was created at: ${new Date(campaignCreatedTime).toISOString()}`);
+         console.log(`Expected message count: ${expectedMessageCount} (based on sent_count: ${campaign.sent_count}, contact_count: ${campaign.contact_count})`);
+         console.log(`Got ${recentMessages.length} messages closest to campaign time from ${data.data.records.length} total messages available`);
+         console.log('Selected messages (closest to campaign time):', recentMessages.map((msg: any) => {
+           const msgTime = parseInt(msg.submitTime);
+           const timeDiffMinutes = Math.round(msg.timeDiff / (1000 * 60));
+           return `${new Date(msgTime).toISOString()} (${timeDiffMinutes} minutes from campaign time)`;
+         }));
 
         const existingReports = campaign.reports_data || [];
         
@@ -492,35 +518,7 @@ export default function CampaignDetails() {
 
   const metrics = calculateCampaignMetrics(campaign);
 
-  // Check if campaign was recently sent and reports might not be ready yet
-  const isRecentlySent = campaign.status === 'sent' && 
-    campaign.reports_data === null && 
-    new Date(campaign.updated_at).getTime() > Date.now() - 30 * 1000; // Within last 30 seconds
 
-  if (isRecentlySent) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => navigate('/campaigns')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Campaigns
-          </Button>
-        </div>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Clock className="h-12 w-12 text-yellow-500 mb-4" />
-            <h3 className="text-lg font-medium mb-2">Reports Processing</h3>
-            <p className="text-muted-foreground text-center mb-4">
-              This campaign was just sent. Reports are being automatically fetched and will be available in a few moments.
-            </p>
-            <Button onClick={() => window.location.reload()}>
-              Refresh Page
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -733,12 +731,23 @@ export default function CampaignDetails() {
           </div>
         </CardHeader>
         <CardContent>
-          {!campaign.reports_data || campaign.reports_data.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
-              <p>No message reports available for this campaign</p>
-              <p className="text-sm">Reports are automatically fetched when campaign status becomes "sent"</p>
-            </div>
+                     {!campaign.reports_data || campaign.reports_data.length === 0 ? (
+             <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-gray-200 rounded-lg min-h-[300px]">
+               <MessageSquare className="h-16 w-16 text-muted-foreground mb-6" />
+               <h3 className="text-xl font-semibold mb-3 text-center">No Reports Available</h3>
+               <p className="text-muted-foreground mb-6 text-center max-w-md">
+                 Click the button below to fetch the latest reports for this campaign.
+               </p>
+               <Button
+                 onClick={refreshCampaignReports}
+                 disabled={refreshing}
+                 className="flex items-center gap-3 px-8 py-3"
+                 size="lg"
+               >
+                 <RefreshCw className={`h-6 w-6 ${refreshing ? 'animate-spin' : ''}`} />
+                 {refreshing ? 'Fetching Reports...' : 'Fetch Reports'}
+               </Button>
+             </div>
           ) : (
             <div className="space-y-4">
               <Table>

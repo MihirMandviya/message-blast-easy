@@ -133,26 +133,26 @@ export default function SupportTickets() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'open':
-        return 'bg-blue-500/20 text-blue-700 border-blue-500/50';
+        return 'bg-blue-50 text-blue-700 border-blue-200';
       case 'pending':
-        return 'bg-yellow-500/20 text-yellow-700 border-yellow-500/50';
+        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
       case 'resolved':
-        return 'bg-green-500/20 text-green-700 border-green-500/50';
+        return 'bg-green-50 text-green-700 border-green-200';
       default:
-        return 'bg-gray-500/20 text-gray-700 border-gray-500/50';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'high':
-        return 'bg-red-500/20 text-red-700 border-red-500/50';
+        return 'bg-red-50 text-red-700 border-red-200';
       case 'medium':
-        return 'bg-yellow-500/20 text-yellow-700 border-yellow-500/50';
+        return 'bg-yellow-50 text-yellow-700 border-yellow-200';
       case 'low':
-        return 'bg-green-500/20 text-green-700 border-green-500/50';
+        return 'bg-green-50 text-green-700 border-green-200';
       default:
-        return 'bg-gray-500/20 text-gray-700 border-gray-500/50';
+        return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
 
@@ -179,24 +179,25 @@ export default function SupportTickets() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
-            Support Tickets
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            Submit and track your support requests
-          </p>
+      <div className="border-b pb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 bg-gray-100 rounded-full">
+            <MessageSquare className="h-6 w-6 text-gray-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900">Support Tickets</h2>
         </div>
-        
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-primary to-primary-glow hover:from-primary-glow hover:to-primary">
-              <Plus className="h-4 w-4 mr-2" />
-              New Ticket
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+        <p className="text-gray-600 text-lg">
+          Submit and track your support requests
+        </p>
+        <div className="mt-6">
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                New Ticket
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Create Support Ticket</DialogTitle>
             </DialogHeader>
@@ -328,7 +329,7 @@ export default function SupportTickets() {
       {/* Tickets List */}
       <div className="space-y-4">
         {filteredTickets.length === 0 ? (
-          <Card className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg">
+          <Card className="border shadow-sm">
             <CardContent className="flex flex-col items-center justify-center py-16">
               <MessageSquare className="h-16 w-16 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">No support tickets found</h3>
@@ -349,7 +350,7 @@ export default function SupportTickets() {
           filteredTickets.map((ticket) => (
             <Card 
               key={ticket.id} 
-              className="border-primary/20 bg-gradient-to-br from-card/80 to-card shadow-lg hover:shadow-xl transition-all duration-300"
+              className="border shadow-sm hover:shadow-md transition-all duration-300"
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
@@ -383,6 +384,7 @@ export default function SupportTickets() {
           ))
         )}
       </div>
+    </div>
     </div>
   );
 }

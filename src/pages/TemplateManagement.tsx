@@ -308,14 +308,17 @@ const TemplateManagement: React.FC = () => {
       ) : (
         <>
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold">Template Management</h1>
-              <p className="text-muted-foreground">
-                Manage your WhatsApp message templates
-              </p>
+          <div className="border-b pb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-gray-100 rounded-full">
+                <FileText className="h-6 w-6 text-gray-600" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900">Template Management</h2>
             </div>
-            <div className="flex space-x-2">
+            <p className="text-gray-600 text-lg">
+              Manage your WhatsApp message templates
+            </p>
+            <div className="flex space-x-2 mt-6">
               <Button
                 onClick={() => setShowCreateForm(true)}
                 size="sm"

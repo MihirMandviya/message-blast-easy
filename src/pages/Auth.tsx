@@ -92,22 +92,17 @@ const Auth = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {/* Test Account Info */}
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                <p className="text-sm text-blue-800 mb-2 font-medium">Test Client Account:</p>
-                <p className="text-xs text-blue-600">Email: nandlal@example.com</p>
-                <p className="text-xs text-blue-600">Password: password_123</p>
-              </div>
+
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="identifier">Email</Label>
+                  <Label htmlFor="identifier">Email or User ID</Label>
                   <Input
                     id="identifier"
-                    type="email"
+                    type="text"
                     value={userIdentifier}
                     onChange={(e) => setUserIdentifier(e.target.value)}
-                    placeholder="Enter your email"
+                    placeholder="Enter your email or user ID"
                     required
                     className="h-12"
                   />

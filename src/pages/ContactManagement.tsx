@@ -562,14 +562,14 @@ const ContactManagement = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-success via-success/90 to-success/80 -mx-6 -mt-6 px-6 py-8 text-white">
+      <div className="border-b pb-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
-            <Users className="h-6 w-6 text-white" />
+          <div className="p-3 bg-gray-100 rounded-full">
+            <Users className="h-6 w-6 text-gray-600" />
           </div>
-          <h2 className="text-3xl font-bold">Contact Management</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Contact Management</h2>
         </div>
-        <p className="text-white/90 text-lg">
+        <p className="text-gray-600 text-lg">
           Manage your customer contacts, organize them into lists, and import from CSV
         </p>
       </div>

@@ -1,4 +1,4 @@
-import { MessageSquare, Send, Users, FileText, Settings, BarChart3, UserPlus, History, Shield, HelpCircle, LayoutTemplate, Workflow, Clock, Upload, Layers, Target, LogOut, User, Bell, ChevronRight, Image, FileBarChart } from "lucide-react";
+import { MessageSquare, Send, Users, FileText, Settings, BarChart3, UserPlus, Shield, HelpCircle, LayoutTemplate, Workflow, Clock, Upload, Layers, Target, LogOut, User, Bell, ChevronRight, Image, FileBarChart } from "lucide-react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAdminAuth } from '@/hooks/useAdminAuth';
 import { useClientAuth } from '@/hooks/useClientAuth';
@@ -30,11 +30,7 @@ const clientItems = [
     url: "/campaigns", 
     icon: Target
   },
-  { 
-    title: "Message History", 
-    url: "/messages", 
-    icon: History
-  },
+
   { 
     title: "Reports", 
     url: "/reports", 

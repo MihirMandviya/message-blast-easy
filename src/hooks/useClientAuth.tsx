@@ -133,11 +133,11 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
       // Clear any existing admin session when client logs in
       localStorage.removeItem('admin_session');
       
-      // Authenticate client using email and mem_password from client_users table
+      // Authenticate client using email OR user_id and mem_password from client_users table
       const { data, error } = await supabase
         .from('client_users')
         .select('*')
-        .eq('email', identifier)
+        .or(`email.eq.${identifier},user_id.eq.${identifier}`)
         .eq('mem_password', password)
         .eq('is_active', true)
         .single();

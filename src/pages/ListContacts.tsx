@@ -324,23 +324,23 @@ export default function ListContacts() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="border-b pb-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-primary-glow bg-clip-text text-transparent">
+            <h2 className="text-3xl font-bold text-gray-900">
               {contactList.name}
-            </h1>
-            <p className="text-muted-foreground mt-2">
+            </h2>
+            <p className="text-gray-600 text-lg mt-2">
               {contactList.description}
             </p>
           </div>
         </div>
         
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-6">
           <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
             <DialogTrigger asChild>
               <Button variant="outline">

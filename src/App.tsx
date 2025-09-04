@@ -14,7 +14,7 @@ import Auth from "./pages/Auth";
 import AdminAuth from "./pages/AdminAuth";
 import Dashboard from "./pages/Dashboard";
 import Campaigns from "./pages/Campaigns";
-import MessageHistory from "./pages/MessageHistory";
+
 import SettingsPage from "./pages/SettingsPage";
 import UserManagement from "./pages/UserManagement";
 import SupportTickets from "./pages/SupportTickets";
@@ -64,13 +64,7 @@ const App = () => (
             </DashboardLayout>
           </ProtectedRoute>
         } />
-              <Route path="/messages" element={
-                <ProtectedRoute>
-                  <DashboardLayout>
-                    <MessageHistory />
-                  </DashboardLayout>
-                </ProtectedRoute>
-              } />
+
               <Route path="/templates" element={
                 <ProtectedRoute>
                   <DashboardLayout>

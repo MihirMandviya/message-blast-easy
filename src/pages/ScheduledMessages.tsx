@@ -236,14 +236,14 @@ const ScheduledMessages = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-info via-info/90 to-info/80 -mx-6 -mt-6 px-6 py-8 text-white">
+      <div className="border-b pb-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
-            <Clock className="h-6 w-6 text-white" />
+          <div className="p-3 bg-gray-100 rounded-full">
+            <Clock className="h-6 w-6 text-gray-600" />
           </div>
-          <h2 className="text-3xl font-bold">Scheduled Messages</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Scheduled Messages</h2>
         </div>
-        <p className="text-white/90 text-lg">
+        <p className="text-gray-600 text-lg">
           Schedule WhatsApp messages to be sent at specific times
         </p>
       </div>

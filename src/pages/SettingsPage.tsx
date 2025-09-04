@@ -141,14 +141,14 @@ const SettingsPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-primary via-primary/90 to-primary/80 -mx-6 -mt-6 px-6 py-8 text-white">
+      <div className="border-b pb-6">
         <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 bg-white/20 rounded-full backdrop-blur-sm">
-            <Settings className="h-6 w-6 text-white" />
+          <div className="p-3 bg-gray-100 rounded-full">
+            <Settings className="h-6 w-6 text-gray-600" />
           </div>
-          <h2 className="text-3xl font-bold">Business Settings</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Business Settings</h2>
         </div>
-        <p className="text-white/90 text-lg">
+        <p className="text-gray-600 text-lg">
           Configure your WhatsApp API and business preferences
         </p>
       </div>

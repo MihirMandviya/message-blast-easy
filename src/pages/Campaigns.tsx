@@ -2,11 +2,6 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DateTimePicker } from "@/components/ui/date-time-picker";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Users, MessageSquare, Target, Calendar, Send, Eye, Edit, Trash2, RotateCcw, RefreshCw, Clock, AlertTriangle, Wallet } from "lucide-react";
@@ -16,6 +11,7 @@ import { useWalletBalance } from "@/hooks/useWalletBalance";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import CampaignCreationWizard from "@/components/CampaignCreationWizard";
 
 interface Campaign {
   id: string;
@@ -65,20 +61,7 @@ export default function Campaigns() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    group_id: '',
-    template_id: '',
-    scheduled_for: null as Date | null,
-    campaign_type: 'draft' as 'draft' | 'scheduled' | 'send_now'
-  });
-  const [variableMappings, setVariableMappings] = useState<{ [key: string]: string }>({});
-  const [selectedMedia, setSelectedMedia] = useState<{ id: string; media_id: string; media_type: string; name: string } | null>(null);
-  const [availableMedia, setAvailableMedia] = useState<Array<{ id: string; name: string; media_type: string; media_id: string; description: string }>>([]);
+  const [showCreateWizard, setShowCreateWizard] = useState(false);
   const [sendingCampaigns, setSendingCampaigns] = useState<Set<string>>(new Set());
   const [overdueCampaigns, setOverdueCampaigns] = useState<number>(0);
   const [showWalletBalance, setShowWalletBalance] = useState(false);
@@ -209,11 +192,12 @@ export default function Campaigns() {
     try {
       setLoading(true);
 
-      // Build query for campaigns
+      // Build query for campaigns - only show completely sent campaigns
       const { data: campaignsData, error: campaignsError } = await supabase
         .from('campaigns')
         .select('*')
         .eq('client_id', client?.id)
+        .eq('status', 'sent')  // Only show campaigns that are completely sent
         .order('created_at', { ascending: false });
 
       if (campaignsError) throw campaignsError;
@@ -279,7 +263,8 @@ export default function Campaigns() {
     }
   };
 
-  const handleCreateCampaign = async () => {
+  // OLD FORM FUNCTION - REMOVED
+  const handleCreateCampaign_OLD = async () => {
     try {
   
       console.log('Form data:', JSON.stringify(formData, null, 2));
@@ -602,63 +587,24 @@ export default function Campaigns() {
     }
   };
 
-  const handleTemplateChange = async (templateId: string) => {
-    const template = templates.find(t => t.id === templateId);
-    setSelectedTemplate(template || null);
-    setFormData(prev => ({ ...prev, template_id: templateId }));
 
-    // Reset variable mappings and media selection when template changes
-    setVariableMappings({});
-    setSelectedMedia(null);
 
-    if (template) {
-      const content = getTemplateContent(template);
-      const variables = extractVariables(content);
-      const newMappings: { [key: string]: string } = {};
-      variables.forEach(variable => {
-        newMappings[variable] = '';
-      });
-      setVariableMappings(newMappings);
+  const getStatusBadge = (status: string) => {
+    const variants = {
+      draft: "secondary",
+      scheduled: "default",
+      sending: "secondary",
+      sent: "success"
+    } as const;
 
-      // If template has a header (like "IMAGE"), load available media
-      if (template.template_header) {
-        await loadAvailableMedia(template.template_header.toLowerCase());
-      } else {
-        setAvailableMedia([]);
-      }
-    } else {
-      setVariableMappings({});
-      setAvailableMedia([]);
-    }
+    return (
+      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
+        {status === 'sending' ? 'Sending...' : status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
   };
 
-  const loadAvailableMedia = async (mediaType: string) => {
-    try {
-      const { data: media, error } = await supabase
-        .from('media')
-        .select('id, name, media_type, media_id, description')
-        .eq('client_id', client?.id)
-        .eq('media_type', mediaType)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error loading media:', error);
-        return;
-      }
-
-      setAvailableMedia(media || []);
-    } catch (error) {
-      console.error('Error loading media:', error);
-    }
-  };
-
-  const handleGroupChange = (groupId: string) => {
-    const group = groups.find(g => g.id === groupId);
-    setSelectedGroup(group || null);
-    setFormData(prev => ({ ...prev, group_id: groupId }));
-  };
-
+  // Helper functions for template processing
   const getTemplateContent = (template: Template): string => {
     const parts = [];
     if (template.template_header) parts.push(template.template_header);
@@ -681,49 +627,6 @@ export default function Campaigns() {
     return variables;
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      draft: "secondary",
-      scheduled: "default",
-      sending: "secondary",
-      sent: "success"
-    } as const;
-
-    return (
-      <Badge variant={variants[status as keyof typeof variants] || "secondary"}>
-        {status === 'sending' ? 'Sending...' : status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
-  const contactFieldOptions = [
-    { value: 'name', label: 'Contact Name' },
-    { value: 'email', label: 'Email Address' },
-    { value: 'phone', label: 'Phone Number' },
-    { value: 'company', label: 'Company' },
-    { value: 'position', label: 'Position' },
-    { value: 'address', label: 'Address' },
-    { value: 'city', label: 'City' },
-    { value: 'state', label: 'State' },
-    { value: 'country', label: 'Country' },
-    { value: 'postal_code', label: 'Postal Code' },
-    { value: 'notes', label: 'Notes' }
-  ];
-
-  const getPreviewContent = (content: string): string => {
-    let previewContent = content;
-    extractVariables(content).forEach(variable => {
-      const mappedField = variableMappings[variable];
-      if (mappedField) {
-        const fieldLabel = contactFieldOptions.find(option => option.value === mappedField)?.label || mappedField;
-        previewContent = previewContent.replace(
-          new RegExp(`\\{\\{${variable}\\}\\}`, 'g'),
-          `[${fieldLabel}]`
-        );
-      }
-    });
-    return previewContent;
-  };
 
   const sendCampaign = async (campaignId: string) => {
     try {
@@ -1627,70 +1530,83 @@ export default function Campaigns() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Campaigns</h1>
-          <p className="text-muted-foreground">Create and manage your WhatsApp campaigns</p>
+      <div className="border-b pb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 bg-gray-100 rounded-full">
+            <Target className="h-6 w-6 text-gray-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900">Campaigns</h2>
         </div>
-                 <div className="flex gap-2">
-           <Button onClick={() => setShowCreateForm(true)} className="flex items-center gap-2">
-             <Plus className="h-4 w-4" />
-             Create Campaign
-           </Button>
-           {/* Wallet Balance Icon */}
-           <div className="relative">
-             <Button
-               variant="outline"
-               size="sm"
-               onClick={async () => {
-                 await fetchWalletBalance();
-                 setShowWalletBalance(true);
-                 setTimeout(() => setShowWalletBalance(false), 3000); // Hide after 3 seconds
-               }}
-               disabled={walletLoading}
-               className="relative"
-               title="Click to view wallet balance"
-             >
-               <Wallet className="h-4 w-4" />
-               {walletLoading && (
-                 <div className="absolute -top-1 -right-1">
-                   <RefreshCw className="h-3 w-3 animate-spin text-green-600" />
-                 </div>
-               )}
-               {balance && !walletLoading && (
-                 <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                   ₹
-                 </div>
-               )}
-             </Button>
-             
-             {/* Wallet Balance Tooltip */}
-             {showWalletBalance && balance && (
-               <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 min-w-[200px]">
-                 <div className="flex items-center gap-2 mb-2">
-                   <Wallet className="h-4 w-4 text-green-600" />
-                   <span className="font-medium text-sm">Wallet Balance</span>
-                 </div>
-                 <div className="space-y-1">
-                   <div className="flex justify-between text-sm">
-                     <span className="text-gray-600">SMS Balance:</span>
-                     <span className="font-medium">₹{formatBalance(balance.smsBalance)}</span>
-                   </div>
-                   {balance.expiryDate && (
-                     <div className="flex justify-between text-sm">
-                       <span className="text-gray-600">Expires:</span>
-                       <span className="font-medium">{formatExpiryDate(balance.expiryDate)}</span>
-                     </div>
-                   )}
-                 </div>
-               </div>
-             )}
-           </div>
-         </div>
+        <p className="text-gray-600 text-lg">
+          Create and manage your WhatsApp campaigns
+        </p>
+        <div className="flex gap-2 mt-6">
+          <Button onClick={() => setShowCreateWizard(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Create Campaign
+          </Button>
+          {/* Wallet Balance Icon */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await fetchWalletBalance();
+                setShowWalletBalance(true);
+                setTimeout(() => setShowWalletBalance(false), 3000); // Hide after 3 seconds
+              }}
+              disabled={walletLoading}
+              className="relative"
+              title="Click to view wallet balance"
+            >
+              <Wallet className="h-4 w-4" />
+              {walletLoading && (
+                <div className="absolute -top-1 -right-1">
+                  <RefreshCw className="h-3 w-3 animate-spin text-gray-600" />
+                </div>
+              )}
+              {balance && !walletLoading && (
+                <div className="absolute -top-1 -right-1 bg-green-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  ₹
+                </div>
+              )}
+            </Button>
+            
+            {/* Wallet Balance Tooltip */}
+            {showWalletBalance && balance && (
+              <div className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-50 min-w-[200px]">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wallet className="h-4 w-4 text-green-600" />
+                  <span className="font-medium text-sm">Wallet Balance</span>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">SMS Balance:</span>
+                    <span className="font-medium">₹{formatBalance(balance.smsBalance)}</span>
+                  </div>
+                  {balance.expiryDate && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Expires:</span>
+                      <span className="font-medium">{formatExpiryDate(balance.expiryDate)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      {/* Create Campaign Form */}
-      {showCreateForm && (
+      {/* Create Campaign Wizard */}
+      {showCreateWizard && (
+        <CampaignCreationWizard
+          onCampaignCreated={loadData}
+          onClose={() => setShowCreateWizard(false)}
+        />
+      )}
+
+      {/* Legacy Create Campaign Form - REMOVED */}
+      {false && (
         <Card className="border-2 border-primary/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -2034,7 +1950,7 @@ export default function Campaigns() {
               >
                 {sendingCampaigns.has('creating') ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
                     {formData.campaign_type === 'send_now' ? 'Creating & Sending...' : 'Creating...'}
                   </>
                 ) : (
@@ -2094,7 +2010,7 @@ export default function Campaigns() {
               <p className="text-muted-foreground text-center mb-4">
                 Create your first campaign to start sending WhatsApp messages to your contacts
               </p>
-              <Button onClick={() => setShowCreateForm(true)}>
+              <Button onClick={() => setShowCreateWizard(true)}>
                 Create Your First Campaign
               </Button>
             </CardContent>
@@ -2157,7 +2073,7 @@ export default function Campaigns() {
                         >
                           {sendingCampaigns.has(campaign.id) ? (
                             <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
                               Sending...
                             </>
                           ) : (
@@ -2177,7 +2093,7 @@ export default function Campaigns() {
                         >
                           {sendingCampaigns.has(campaign.id) ? (
                             <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2" />
                               Sending...
                             </>
                           ) : (

@@ -72,35 +72,26 @@ export default function CampaignReports() {
     });
   };
 
-  // Function to handle fetching reports for a specific campaign
-  const handleFetchReports = async (campaign: Campaign) => {
-    try {
-      setFetchingReports(campaign.id);
-      const result = await fetchCampaignReports(campaign);
-      
-      if (result === null) {
-        // Reports not ready yet
-        toast({
-          title: "Reports Not Ready",
-          description: `Reports for campaign "${campaign.name}" are not available yet. Please wait a few minutes and try again.`,
-          variant: "default",
-        });
-      } else {
-        toast({
-          title: "Success",
-          description: `Reports fetched for campaign "${campaign.name}"`,
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to fetch reports for campaign "${campaign.name}"`,
-        variant: "destructive",
-      });
-    } finally {
-      setFetchingReports(null);
-    }
-  };
+     // Function to handle fetching reports for a specific campaign
+   const handleFetchReports = async (campaign: Campaign) => {
+     try {
+       setFetchingReports(campaign.id);
+       await fetchCampaignReports(campaign);
+       
+       toast({
+         title: "Success",
+         description: `Reports fetched for campaign "${campaign.name}"`,
+       });
+     } catch (error) {
+       toast({
+         title: "Error",
+         description: `Failed to fetch reports for campaign "${campaign.name}"`,
+         variant: "destructive",
+       });
+     } finally {
+       setFetchingReports(null);
+     }
+   };
 
   // Filter campaigns based on selected campaign
   const filteredCampaigns = selectedCampaign === 'all' 
@@ -316,37 +307,42 @@ export default function CampaignReports() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Campaign Reports</h1>
-          <p className="text-muted-foreground">Performance metrics for your campaigns</p>
+      <div className="border-b pb-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-3 bg-gray-100 rounded-full">
+            <BarChart3 className="h-6 w-6 text-gray-600" />
+          </div>
+          <h2 className="text-3xl font-bold text-gray-900">Campaign Reports</h2>
         </div>
-                 <div className="flex gap-2">
-           <Button
-             onClick={handleManualMonitor}
-             variant="outline"
-             className="flex items-center gap-2"
-           >
-             <RefreshCw className="h-4 w-4" />
-             Manual Monitor
-           </Button>
-           <Button
-             onClick={handleRefreshReports}
-             variant="outline"
-             className="flex items-center gap-2"
-           >
-             <RefreshCw className="h-4 w-4" />
-             Refresh Reports
-           </Button>
-           <Button
-             onClick={exportCampaignReports}
-             variant="outline"
-             className="flex items-center gap-2"
-           >
-             <Download className="h-4 w-4" />
-             Export CSV
-           </Button>
-         </div>
+        <p className="text-gray-600 text-lg">
+          Performance metrics for your campaigns
+        </p>
+        <div className="flex gap-2 mt-6">
+          <Button
+            onClick={handleManualMonitor}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Manual Monitor
+          </Button>
+          <Button
+            onClick={handleRefreshReports}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh Reports
+          </Button>
+          <Button
+            onClick={exportCampaignReports}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
              {/* Info Alert */}
@@ -354,17 +350,15 @@ export default function CampaignReports() {
          <CardContent className="pt-4">
            <div className="flex items-start gap-2">
              <Info className="h-5 w-5 text-blue-600 mt-0.5" />
-             <div className="text-sm text-blue-800">
-               <p className="font-medium mb-1">Campaign Reports</p>
-               <p>
-                 Reports are automatically fetched when campaigns are marked as "sent" or "sending" with sent_count > 0. 
-                 Each campaign stores its specific message reports for accurate tracking.
-                 <br />
-                 <strong>Note:</strong> Reports may take 5-10 minutes to become available after messages are sent, as WhatsApp Business Hub needs time to process and report on message delivery.
-                 <br />
-                 <strong>Auto-monitoring:</strong> The system automatically checks for campaigns needing reports every 20 seconds and runs immediately when the page loads.
-               </p>
-             </div>
+                            <div className="text-sm text-blue-800">
+                 <p className="font-medium mb-1">Campaign Reports</p>
+                 <p>
+                   Reports are automatically fetched when campaigns are marked as "sent" or "sending" with sent_count > 0. 
+                   Each campaign stores its specific message reports for accurate tracking.
+                   <br />
+                   <strong>Auto-monitoring:</strong> The system automatically checks for campaigns needing reports every 20 seconds and runs immediately when the page loads.
+                 </p>
+               </div>
            </div>
          </CardContent>
        </Card>
@@ -554,17 +548,7 @@ export default function CampaignReports() {
                             <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
                             <h3 className="text-lg font-medium mb-2">No Reports Available</h3>
                             <p className="text-muted-foreground mb-4">
-                              {(() => {
-                                const campaignCreatedTime = new Date(campaign.created_at).getTime();
-                                const timeSinceCreation = Date.now() - campaignCreatedTime;
-                                const tenMinutesInMs = 10 * 60 * 1000;
-                                
-                                if (timeSinceCreation < tenMinutesInMs) {
-                                  return `Campaign was created ${Math.round(timeSinceCreation / 60000)} minutes ago. Reports may not be available yet.`;
-                                } else {
-                                  return 'Click the button below to fetch the latest reports for this campaign.';
-                                }
-                              })()}
+                              Click the button below to fetch the latest reports for this campaign.
                             </p>
                             <Button
                               onClick={() => handleFetchReports(campaign)}
@@ -575,20 +559,6 @@ export default function CampaignReports() {
                               <RefreshCw className={`h-5 w-5 ${fetchingReports === campaign.id ? 'animate-spin' : ''}`} />
                               {fetchingReports === campaign.id ? 'Fetching Reports...' : 'Fetch Reports'}
                             </Button>
-                            {(() => {
-                              const campaignCreatedTime = new Date(campaign.created_at).getTime();
-                              const timeSinceCreation = Date.now() - campaignCreatedTime;
-                              const tenMinutesInMs = 10 * 60 * 1000;
-                              
-                              if (timeSinceCreation < tenMinutesInMs) {
-                                return (
-                                  <p className="text-xs text-muted-foreground mt-2">
-                                    ⏰ Reports typically become available 5-10 minutes after sending
-                                  </p>
-                                );
-                              }
-                              return null;
-                            })()}
                           </div>
                         ) : (
                           <div className="text-center py-4 bg-green-50 border border-green-200 rounded-lg mt-4">
@@ -629,40 +599,17 @@ export default function CampaignReports() {
                                 <Download className="h-4 w-4" />
                                 Export
                               </Button>
-                                                         ) : (
-                               <div className="flex gap-2">
-                                 <Button
-                                   variant="outline"
-                                   size="sm"
-                                   onClick={() => handleFetchReports(campaign)}
-                                   disabled={fetchingReports === campaign.id}
-                                   className="flex items-center gap-2"
-                                 >
-                                   <RefreshCw className={`h-4 w-4 ${fetchingReports === campaign.id ? 'animate-spin' : ''}`} />
-                                   {fetchingReports === campaign.id ? 'Fetching...' : 'Fetch Reports'}
-                                 </Button>
-                                 {(() => {
-                                   const campaignCreatedTime = new Date(campaign.created_at).getTime();
-                                   const timeSinceCreation = Date.now() - campaignCreatedTime;
-                                   const tenMinutesInMs = 10 * 60 * 1000;
-                                   
-                                   if (timeSinceCreation < tenMinutesInMs) {
-                                     return (
-                                       <Button
-                                         variant="outline"
-                                         size="sm"
-                                         disabled
-                                         className="flex items-center gap-2"
-                                         title="Reports not available yet for recent campaigns"
-                                       >
-                                         <Clock className="h-4 w-4" />
-                                         Wait for Reports
-                                       </Button>
-                                     );
-                                   }
-                                   return null;
-                                 })()}
-                               </div>
+                                                                                      ) : (
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => handleFetchReports(campaign)}
+                                 disabled={fetchingReports === campaign.id}
+                                 className="flex items-center gap-2"
+                               >
+                                 <RefreshCw className={`h-4 w-4 ${fetchingReports === campaign.id ? 'animate-spin' : ''}`} />
+                                 {fetchingReports === campaign.id ? 'Fetching...' : 'Fetch Reports'}
+                               </Button>
                              )}
                           </div>
                         </div>
