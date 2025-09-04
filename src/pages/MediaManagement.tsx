@@ -444,6 +444,39 @@ const MediaManagement: React.FC = () => {
                   <Badge variant="outline" className="text-xs">
                     {mediaItem.media_type}
                   </Badge>
+                  <Badge 
+                    variant="outline" 
+                    className={
+                      // Check for various possible approved status values
+                      mediaItem.status === 'APPROVED' || 
+                      mediaItem.status === 'approved' || 
+                      mediaItem.status === 'enabled' || 
+                      mediaItem.status === 'ENABLED' ||
+                      mediaItem.status === 'active' ||
+                      mediaItem.status === 'ACTIVE' ||
+                      mediaItem.status === 'valid' ||
+                      mediaItem.status === 'VALID'
+                        ? 'bg-green-100 text-green-800 border-green-200' 
+                        : // Check for various possible pending status values
+                        mediaItem.status === 'PENDING' || 
+                        mediaItem.status === 'pending' ||
+                        mediaItem.status === 'processing' ||
+                        mediaItem.status === 'PROCESSING'
+                        ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                        : // Check for various possible rejected status values
+                        mediaItem.status === 'REJECTED' || 
+                        mediaItem.status === 'rejected' ||
+                        mediaItem.status === 'failed' ||
+                        mediaItem.status === 'FAILED' ||
+                        mediaItem.status === 'invalid' ||
+                        mediaItem.status === 'INVALID'
+                        ? 'bg-red-100 text-red-800 border-red-200'
+                        : // Default gray for unknown status
+                        'bg-gray-100 text-gray-800 border-gray-200'
+                    }
+                  >
+                    {mediaItem.status || 'No Status'}
+                  </Badge>
                 </div>
                 <div className="flex space-x-1">
                   <Button

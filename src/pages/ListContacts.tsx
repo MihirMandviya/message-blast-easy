@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -23,7 +24,9 @@ import {
   Trash2,
   Phone,
   Mail,
-  Calendar
+  Calendar,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 interface Contact {
@@ -77,6 +80,15 @@ export default function ListContacts() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContact, setDeletingContact] = useState<string | null>(null);
+  const [showAddContactDialog, setShowAddContactDialog] = useState(false);
+  const [showOptionalFields, setShowOptionalFields] = useState(false);
+  const [newContact, setNewContact] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    tags: '',
+    notes: ''
+  });
 
   // Get clientId from URL params if available
   const clientId = searchParams.get('clientId');
@@ -436,6 +448,66 @@ export default function ListContacts() {
     }
   };
 
+  const handleAddContact = async () => {
+    if (!client || !listId) return;
+
+    // Basic validation
+    if (!newContact.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a contact name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newContact.phone.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const contactData = {
+        name: newContact.name.trim(),
+        phone: newContact.phone.trim(),
+        email: newContact.email.trim() || null,
+        tags: newContact.tags ? newContact.tags.split(',').map(tag => tag.trim()).filter(Boolean) : [],
+        notes: newContact.notes.trim() || null,
+        user_id: client.id,
+        client_id: client.id,
+        group_id: listId
+      };
+
+      const { data: contact, error: contactError } = await supabase
+        .from('contacts')
+        .insert([contactData])
+        .select()
+        .single();
+
+      if (contactError) throw contactError;
+
+      toast({
+        title: "Success",
+        description: "Contact added successfully",
+      });
+
+      setNewContact({ name: '', phone: '', email: '', tags: '', notes: '' });
+      setShowAddContactDialog(false);
+      setShowOptionalFields(false);
+      fetchListData(); // Refresh the data
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredContacts = contacts.filter(contact =>
     contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     contact.phone.includes(searchTerm) ||
@@ -579,10 +651,114 @@ export default function ListContacts() {
             </Button>
           )}
           
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Contact
-          </Button>
+          <Dialog open={showAddContactDialog} onOpenChange={setShowAddContactDialog}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Contact
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>Add New Contact</DialogTitle>
+                <DialogDescription>
+                  Add a new contact to this list
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="name">Full Name *</Label>
+                  <Input
+                    id="name"
+                    value={newContact.name}
+                    onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
+                    placeholder="Enter full name"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input
+                    id="phone"
+                    value={newContact.phone}
+                    onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                    placeholder="+1234567890"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newContact.email}
+                    onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                    placeholder="email@example.com"
+                  />
+                </div>
+                
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowOptionalFields(!showOptionalFields)}
+                    className="flex items-center gap-2"
+                  >
+                    {showOptionalFields ? (
+                      <>
+                        <ChevronUp className="h-4 w-4" />
+                        Hide Optional Fields
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-4 w-4" />
+                        Show Optional Fields
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {showOptionalFields && (
+                  <>
+                    <div>
+                      <Label htmlFor="tags">Tags (comma-separated)</Label>
+                      <Input
+                        id="tags"
+                        value={newContact.tags}
+                        onChange={(e) => setNewContact({ ...newContact, tags: e.target.value })}
+                        placeholder="customer, vip, lead"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="notes">Notes</Label>
+                      <Textarea
+                        id="notes"
+                        value={newContact.notes}
+                        onChange={(e) => setNewContact({ ...newContact, notes: e.target.value })}
+                        placeholder="Add any notes about this contact..."
+                        rows={3}
+                      />
+                    </div>
+                  </>
+                )}
+                
+                <div className="flex justify-end gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setShowAddContactDialog(false);
+                      setShowOptionalFields(false);
+                      setNewContact({ name: '', phone: '', email: '', tags: '', notes: '' });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddContact}>
+                    Add Contact
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

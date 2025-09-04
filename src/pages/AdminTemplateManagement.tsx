@@ -368,10 +368,32 @@ const TemplateGrid: React.FC<TemplateGridProps> = ({ templates, onDeleteTemplate
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 {getMediaTypeIcon(template.media_type)}
-                <Badge variant={template.whatsapp_status === 'APPROVED' ? 'default' : 'secondary'}>
+                <Badge 
+                  variant="outline" 
+                  className={
+                    template.whatsapp_status === 'APPROVED' || template.whatsapp_status === 'enabled' 
+                      ? 'bg-green-100 text-green-800 border-green-200' 
+                      : template.whatsapp_status === 'PENDING'
+                      ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                      : template.whatsapp_status === 'REJECTED'
+                      ? 'bg-red-100 text-red-800 border-red-200'
+                      : 'bg-gray-100 text-gray-800 border-gray-200'
+                  }
+                >
                   {template.whatsapp_status}
                 </Badge>
-                <Badge variant={template.system_status === 'enabled' ? 'default' : 'secondary'}>
+                <Badge 
+                  variant="outline" 
+                  className={
+                    template.system_status === 'APPROVED' || template.system_status === 'enabled' 
+                      ? 'bg-green-100 text-green-800 border-green-200' 
+                      : template.system_status === 'PENDING'
+                      ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+                      : template.system_status === 'REJECTED'
+                      ? 'bg-red-100 text-red-800 border-red-200'
+                      : 'bg-gray-100 text-gray-800 border-gray-200'
+                  }
+                >
                   {template.system_status}
                 </Badge>
               </div>
