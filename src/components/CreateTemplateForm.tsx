@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Plus, X, Image, Video, FileText, Music, RefreshCw, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Button {
   text: string;
@@ -32,6 +33,18 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
   const { media, isLoading: mediaLoading, syncMediaWithDatabase } = useMedia();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templateNameError, setTemplateNameError] = useState<string>('');
+  const [duplicateCheckTimeout, setDuplicateCheckTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (duplicateCheckTimeout) {
+        clearTimeout(duplicateCheckTimeout);
+      }
+    };
+  }, [duplicateCheckTimeout]);
+
 
   // Form state
   const [templateName, setTemplateName] = useState('');
@@ -52,6 +65,45 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
   // Buttons state
   const [buttons, setButtons] = useState<Button[]>([]);
   const [showButtons, setShowButtons] = useState(false);
+
+  // Duplicate check function
+  const checkTemplateNameDuplicate = async (name: string) => {
+    if (!name.trim() || !client) {
+      setTemplateNameError('');
+      return;
+    }
+
+    // Validate template name format (alphanumeric, underscore, hyphen only)
+    const validNamePattern = /^[a-zA-Z0-9_-]+$/;
+    if (!validNamePattern.test(name.trim())) {
+      setTemplateNameError('Template name can only contain letters, numbers, underscores, and hyphens');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('id')
+        .eq('template_name', name.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error checking template name:', error);
+        setTemplateNameError('Error checking template name. Please try again.');
+        return;
+      }
+
+      if (data) {
+        setTemplateNameError('A template with this name already exists');
+      } else {
+        setTemplateNameError('');
+      }
+    } catch (error) {
+      console.error('Error checking template name:', error);
+      setTemplateNameError('Error checking template name. Please try again.');
+    }
+  };
 
   const handleAddButton = () => {
     if (buttons.length >= 3) {
@@ -95,12 +147,6 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
     const selectedMedia = media.find(item => item.media_id === mediaId);
     if (selectedMedia) {
       const mediaUrl = `https://theultimate.io/WAApi/media/download?userid=${client?.user_id}&mediaId=${mediaId}`;
-      console.log('Media selected:', {
-        mediaId,
-        mediaName: selectedMedia.name,
-        mediaUrl,
-        clientUserId: client?.user_id
-      });
       
       setSelectedMediaId(mediaId);
       setHeaderFileUrl(mediaUrl);
@@ -118,23 +164,10 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
     }
   };
 
-  // Debug effect to monitor state changes
-  useEffect(() => {
-    console.log('CreateTemplateForm state update:', {
-      selectedMediaId,
-      headerFileUrl,
-      msgType,
-      mediaType
-    });
-  }, [selectedMediaId, headerFileUrl, msgType, mediaType]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('CreateTemplateForm - Client data:', client);
-    console.log('CreateTemplateForm - API Key:', client?.whatsapp_api_key);
-    console.log('CreateTemplateForm - User ID:', client?.user_id);
-    console.log('CreateTemplateForm - WhatsApp Number:', client?.whatsapp_number);
     
     if (!client?.whatsapp_api_key || !client?.user_id || !client?.whatsapp_number) {
       setError('Missing API credentials. Please contact your administrator.');
@@ -197,11 +230,6 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
       if (msgType === 'media') {
         requestBody.mediaType = mediaType;
         
-        // Debug logging
-        console.log('Media template validation:');
-        console.log('- headerFileUrl:', headerFileUrl);
-        console.log('- headerFileUrl.trim():', headerFileUrl.trim());
-        console.log('- selectedMediaId:', selectedMediaId);
         
         // Validate headerFile URL for media templates
         if (!headerFileUrl.trim()) {
@@ -211,7 +239,6 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
         }
 
         requestBody.headerFile = headerFileUrl.trim();
-        console.log('Media template - using headerFile:', requestBody.headerFile);
       }
 
       // Add buttons
@@ -219,7 +246,6 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
         requestBody.buttons = buttons;
       }
 
-      console.log('Final request body for template creation:', requestBody);
 
       const response = await fetch('/api/create-template', {
         method: 'POST',
@@ -230,7 +256,6 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
       });
 
       const data = await response.json();
-      console.log('API Response:', data);
 
       if (!response.ok) {
         console.error('API Error Response:', data);
@@ -300,10 +325,28 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
               <Input
                 id="templateName"
                 value={templateName}
-                onChange={(e) => setTemplateName(e.target.value)}
+                onChange={(e) => {
+                  setTemplateName(e.target.value);
+                  
+                  // Clear previous timeout
+                  if (duplicateCheckTimeout) {
+                    clearTimeout(duplicateCheckTimeout);
+                  }
+                  
+                  // Set new timeout for duplicate check
+                  const timeout = setTimeout(() => {
+                    checkTemplateNameDuplicate(e.target.value);
+                  }, 300);
+                  
+                  setDuplicateCheckTimeout(timeout);
+                }}
                 placeholder="e.g., welcome_message"
                 required
+                className={templateNameError ? 'border-red-500' : ''}
               />
+              {templateNameError && (
+                <p className="text-sm text-red-500">{templateNameError}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="templateDescription">Description</Label>
@@ -667,7 +710,7 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || !!templateNameError}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create Template
             </Button>

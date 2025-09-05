@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Button {
   text: string;
@@ -27,6 +28,7 @@ const AdminCreateTemplateForm: React.FC<AdminCreateTemplateFormProps> = ({ onSuc
   const { clients, createTemplateForClient } = useAdminTemplates();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templateNameError, setTemplateNameError] = useState<string>('');
 
   // Form state
   const [clientId, setClientId] = useState(selectedClientId || '');
@@ -47,6 +49,45 @@ const AdminCreateTemplateForm: React.FC<AdminCreateTemplateFormProps> = ({ onSuc
   // Buttons state
   const [buttons, setButtons] = useState<Button[]>([]);
   const [showButtons, setShowButtons] = useState(false);
+
+  // Duplicate check function
+  const checkTemplateNameDuplicate = async (name: string) => {
+    if (!name.trim() || !clientId) {
+      setTemplateNameError('');
+      return;
+    }
+
+    // Validate template name format (alphanumeric, underscore, hyphen only)
+    const validNamePattern = /^[a-zA-Z0-9_-]+$/;
+    if (!validNamePattern.test(name.trim())) {
+      setTemplateNameError('Template name can only contain letters, numbers, underscores, and hyphens');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('templates')
+        .select('id')
+        .eq('template_name', name.trim())
+        .eq('client_id', clientId)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error checking template name:', error);
+        setTemplateNameError('Error checking template name. Please try again.');
+        return;
+      }
+
+      if (data) {
+        setTemplateNameError('A template with this name already exists');
+      } else {
+        setTemplateNameError('');
+      }
+    } catch (error) {
+      console.error('Error checking template name:', error);
+      setTemplateNameError('Error checking template name. Please try again.');
+    }
+  };
 
   // Update clientId when selectedClientId prop changes
   useEffect(() => {
@@ -218,10 +259,18 @@ const AdminCreateTemplateForm: React.FC<AdminCreateTemplateFormProps> = ({ onSuc
                 <Input
                   id="templateName"
                   value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
+                  onChange={(e) => {
+                    setTemplateName(e.target.value);
+                    // Debounce the duplicate check
+                    setTimeout(() => checkTemplateNameDuplicate(e.target.value), 500);
+                  }}
                   placeholder="Enter template name"
                   required
+                  className={templateNameError ? 'border-red-500' : ''}
                 />
+                {templateNameError && (
+                  <p className="text-sm text-red-500">{templateNameError}</p>
+                )}
               </div>
               <div>
                 <Label htmlFor="templateDescription">Description</Label>
@@ -497,7 +546,7 @@ const AdminCreateTemplateForm: React.FC<AdminCreateTemplateFormProps> = ({ onSuc
           <Button type="button" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading || !!templateNameError}>
             {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
             Create Template
           </Button>

@@ -524,7 +524,13 @@ app.delete('/api/delete-template', async (req, res) => {
 // Proxy endpoint for uploading media
 app.post('/api/upload-media', async (req, res) => {
   try {
-    const { userId, wabaNumber, mediaType, identifier, description, mediaFile } = req.body;
+    // Handle FormData fields (they come as userid, not userId)
+    const userId = req.body.userid || req.body.userId;
+    const wabaNumber = req.body.wabaNumber;
+    const mediaType = req.body.mediaType;
+    const identifier = req.body.identifier;
+    const description = req.body.description;
+    const mediaFile = req.body.mediaFile;
     
     if (!userId || !wabaNumber || !mediaType || !identifier || !mediaFile) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -627,30 +633,32 @@ app.post('/api/upload-media', async (req, res) => {
     }
 
     if (data.status === 'success') {
-      // Get the client_id (from clients table) for this user
-      let clientOrgId = userId;
+      // Get the client data for this user
+      let clientOrgId = null;
+      let clientUserId = null;
       try {
         const { data: clientUserData, error: clientUserError } = await supabase
           .from('client_users')
-          .select('client_id')
+          .select('id, client_id')
           .eq('user_id', userId)
           .single();
         
-        if (!clientUserError && clientUserData?.client_id) {
-          clientOrgId = clientUserData.client_id;
-          console.log('Retrieved client_id from database:', clientOrgId);
+        if (!clientUserError && clientUserData) {
+          clientOrgId = clientUserData.client_id; // This is the UUID for the clients table
+          clientUserId = clientUserData.id; // This is the UUID for the client_users table
+          console.log('Retrieved client data:', { clientOrgId, clientUserId });
         }
       } catch (error) {
-        console.error('Error fetching client_id:', error);
+        console.error('Error fetching client data:', error);
       }
 
       // Store media info in database
       const { error: dbError } = await supabase
         .from('media')
         .upsert({
-          user_id: clientOrgId, // Use the organization/client ID
-          client_id: userId, // Use the current client_user ID
-          added_by: userId, // Set added_by to the current user
+          user_id: clientOrgId, // Use the organization/client ID (UUID)
+          client_id: clientUserId, // Use the current client_user ID (UUID)
+          added_by: clientUserId, // Set added_by to the current user (UUID)
           name: identifier,
           description: description || '',
           media_type: mediaType,

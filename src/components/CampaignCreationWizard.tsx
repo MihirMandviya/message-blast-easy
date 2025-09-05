@@ -99,6 +99,10 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
   const [creatingListFromCsv, setCreatingListFromCsv] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Duplicate check states
+  const [campaignNameError, setCampaignNameError] = useState<string>('');
+  const [listNameError, setListNameError] = useState<string>('');
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -110,6 +114,65 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
 
   const { toast } = useToast();
   const { client, isLoading: clientLoading } = useClientAuth();
+
+  // Duplicate check functions
+  const checkCampaignNameDuplicate = async (name: string) => {
+    if (!name.trim() || !client) {
+      setCampaignNameError('');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('campaigns')
+        .select('id')
+        .eq('name', name.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error checking campaign name:', error);
+        return;
+      }
+
+      if (data) {
+        setCampaignNameError('A campaign with this name already exists');
+      } else {
+        setCampaignNameError('');
+      }
+    } catch (error) {
+      console.error('Error checking campaign name:', error);
+    }
+  };
+
+  const checkListNameDuplicate = async (name: string) => {
+    if (!name.trim() || !client) {
+      setListNameError('');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('name', name.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error checking list name:', error);
+        return;
+      }
+
+      if (data) {
+        setListNameError('A contact list with this name already exists');
+      } else {
+        setListNameError('');
+      }
+    } catch (error) {
+      console.error('Error checking list name:', error);
+    }
+  };
 
   // Contact field options for variable mapping
   const contactFieldOptions = [
@@ -604,7 +667,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
   const canProceedToNext = (): boolean => {
     switch (currentStep) {
       case 1:
-        return formData.name.trim() !== '';
+        return formData.name.trim() !== '' && !campaignNameError;
       case 2:
         if (contactSelectionType === 'existing') {
           return formData.group_id !== '' && selectedGroup && selectedGroup.contact_count > 0;
@@ -885,8 +948,16 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
                   id="name"
                   placeholder="Enter campaign name"
                   value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, name: e.target.value }));
+                    // Debounce the duplicate check
+                    setTimeout(() => checkCampaignNameDuplicate(e.target.value), 500);
+                  }}
+                  className={campaignNameError ? 'border-red-500' : ''}
                 />
+                {campaignNameError && (
+                  <p className="text-sm text-red-500">{campaignNameError}</p>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -1499,8 +1570,16 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
                   id="list-name"
                   placeholder="Enter list name"
                   value={newListName}
-                  onChange={(e) => setNewListName(e.target.value)}
+                  onChange={(e) => {
+                    setNewListName(e.target.value);
+                    // Debounce the duplicate check
+                    setTimeout(() => checkListNameDuplicate(e.target.value), 500);
+                  }}
+                  className={listNameError ? 'border-red-500' : ''}
                 />
+                {listNameError && (
+                  <p className="text-sm text-red-500">{listNameError}</p>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -1529,7 +1608,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
                 {contactSelectionType === 'csv' ? (
                   <Button
                     onClick={handleCreateListFromCsv}
-                    disabled={!newListName.trim() || !csvContent.trim() || creatingListFromCsv}
+                    disabled={!newListName.trim() || !csvContent.trim() || creatingListFromCsv || !!listNameError}
                   >
                     {creatingListFromCsv ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1541,7 +1620,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
                 ) : (
                   <Button
                     onClick={handleCreateNewList}
-                    disabled={!newListName.trim() || creatingList}
+                    disabled={!newListName.trim() || creatingList || !!listNameError}
                   >
                     {creatingList ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { 
   Calendar, 
-  Search, 
   Download, 
   RefreshCw, 
   Filter,
@@ -73,10 +70,6 @@ const Reports: React.FC = () => {
 
   const [reportType, setReportType] = useState<'daily' | 'monthly'>('daily');
   const [filters, setFilters] = useState({
-    fromDate: '',
-    toDate: '',
-    mobileNo: '',
-    pageLimit: 100,
     startCursor: '1'
   });
 
@@ -101,43 +94,100 @@ const Reports: React.FC = () => {
       toDate = formatDateForAPI(lastDay, '23:59:59');
     }
 
-    setFilters(prev => ({
-      ...prev,
-      fromDate,
-      toDate
-    }));
-
     fetchReports({
       fromDate,
-      toDate
+      toDate,
+      pageLimit: 100,
+      ...filters
     });
   }, [reportType, fetchReports]);
 
-  const handleFilterChange = (key: string, value: string | number) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
-  };
 
   const handleSearch = () => {
-    fetchReports(filters);
+    // Set default dates based on report type
+    const now = new Date();
+    let fromDate = '';
+    let toDate = '';
+
+    if (reportType === 'daily') {
+      // Today's date
+      fromDate = formatDateForAPI(now, '00:00:00');
+      toDate = formatDateForAPI(now, '23:59:59');
+    } else {
+      // First and last day of current month
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      fromDate = formatDateForAPI(firstDay, '00:00:00');
+      toDate = formatDateForAPI(lastDay, '23:59:59');
+    }
+
+    fetchReports({
+      fromDate,
+      toDate,
+      pageLimit: 100,
+      ...filters
+    });
   };
 
   const handleReset = () => {
     const defaultFilters = {
-      fromDate: '',
-      toDate: '',
-      mobileNo: '',
-      pageLimit: 100,
       startCursor: '1'
     };
     setFilters(defaultFilters);
-    fetchReports(defaultFilters);
+    
+    // Set default dates based on report type
+    const now = new Date();
+    let fromDate = '';
+    let toDate = '';
+
+    if (reportType === 'daily') {
+      // Today's date
+      fromDate = formatDateForAPI(now, '00:00:00');
+      toDate = formatDateForAPI(now, '23:59:59');
+    } else {
+      // First and last day of current month
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      fromDate = formatDateForAPI(firstDay, '00:00:00');
+      toDate = formatDateForAPI(lastDay, '23:59:59');
+    }
+
+    fetchReports({
+      fromDate,
+      toDate,
+      pageLimit: 100,
+      ...defaultFilters
+    });
   };
 
   const handleNextPage = () => {
     if (reports?.cursors?.next) {
       const newFilters = { ...filters, startCursor: reports.cursors.next };
       setFilters(newFilters);
-      fetchReports(newFilters);
+      
+      // Set default dates based on report type
+      const now = new Date();
+      let fromDate = '';
+      let toDate = '';
+
+      if (reportType === 'daily') {
+        fromDate = formatDateForAPI(now, '00:00:00');
+        toDate = formatDateForAPI(now, '23:59:59');
+      } else {
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        fromDate = formatDateForAPI(firstDay, '00:00:00');
+        toDate = formatDateForAPI(lastDay, '23:59:59');
+      }
+
+      fetchReports({
+        fromDate,
+        toDate,
+        pageLimit: 100,
+        ...newFilters
+      });
     }
   };
 
@@ -145,7 +195,28 @@ const Reports: React.FC = () => {
     if (reports?.cursors?.start && reports.pages.current > 1) {
       const newFilters = { ...filters, startCursor: reports.cursors.start };
       setFilters(newFilters);
-      fetchReports(newFilters);
+      
+      // Set default dates based on report type
+      const now = new Date();
+      let fromDate = '';
+      let toDate = '';
+
+      if (reportType === 'daily') {
+        fromDate = formatDateForAPI(now, '00:00:00');
+        toDate = formatDateForAPI(now, '23:59:59');
+      } else {
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        fromDate = formatDateForAPI(firstDay, '00:00:00');
+        toDate = formatDateForAPI(lastDay, '23:59:59');
+      }
+
+      fetchReports({
+        fromDate,
+        toDate,
+        pageLimit: 100,
+        ...newFilters
+      });
     }
   };
 
@@ -340,6 +411,35 @@ const Reports: React.FC = () => {
     });
   };
 
+  // Add error boundary for the component
+  if (error) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">WhatsApp Reports</h1>
+            <p className="text-muted-foreground">
+              View and analyze your WhatsApp message delivery reports
+            </p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Error Loading Reports</h3>
+              <p className="text-muted-foreground mb-4">{error}</p>
+              <Button onClick={() => window.location.reload()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -414,7 +514,8 @@ const Reports: React.FC = () => {
 
                     fetchReports({
                       fromDate,
-                      toDate
+                      toDate,
+                      pageLimit: 100
                     });
                   }}
                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
@@ -455,7 +556,8 @@ const Reports: React.FC = () => {
 
                     fetchReports({
                       fromDate,
-                      toDate
+                      toDate,
+                      pageLimit: 100
                     });
                   }}
                   className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
@@ -464,55 +566,6 @@ const Reports: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">From Date</label>
-                <Input
-                  type="datetime-local"
-                  value={filters.fromDate}
-                  onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">To Date</label>
-                <Input
-                  type="datetime-local"
-                  value={filters.toDate}
-                  onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Mobile Number</label>
-                <Input
-                  placeholder="Enter mobile number"
-                  value={filters.mobileNo}
-                  onChange={(e) => handleFilterChange('mobileNo', e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Page Limit</label>
-                <Select
-                  value={filters.pageLimit.toString()}
-                  onValueChange={(value) => handleFilterChange('pageLimit', parseInt(value))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="flex justify-end mt-4">
-              <Button onClick={handleSearch} disabled={isLoading}>
-                <Search className="h-4 w-4 mr-2" />
-                Search
-              </Button>
-            </div>
           </CardContent>
                  </Card>
 

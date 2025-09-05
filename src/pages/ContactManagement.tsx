@@ -80,8 +80,39 @@ const ContactManagement = () => {
     name: '',
     description: ''
   });
+  const [groupNameError, setGroupNameError] = useState<string>('');
 
   const { toast } = useToast();
+
+  // Duplicate check function
+  const checkGroupNameDuplicate = async (name: string) => {
+    if (!name.trim() || !client) {
+      setGroupNameError('');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('groups')
+        .select('id')
+        .eq('name', name.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error checking group name:', error);
+        return;
+      }
+
+      if (data) {
+        setGroupNameError('A contact list with this name already exists');
+      } else {
+        setGroupNameError('');
+      }
+    } catch (error) {
+      console.error('Error checking group name:', error);
+    }
+  };
 
   // Load groups on component mount
   useEffect(() => {
@@ -945,9 +976,17 @@ const ContactManagement = () => {
                     <Input
                       id="group-name"
                       value={newGroup.name}
-                      onChange={(e) => setNewGroup({ ...newGroup, name: e.target.value })}
+                      onChange={(e) => {
+                        setNewGroup({ ...newGroup, name: e.target.value });
+                        // Debounce the duplicate check
+                        setTimeout(() => checkGroupNameDuplicate(e.target.value), 500);
+                      }}
                       placeholder="e.g., VIP Customers, Leads, etc."
+                      className={groupNameError ? 'border-red-500' : ''}
                     />
+                    {groupNameError && (
+                      <p className="text-sm text-red-500">{groupNameError}</p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="group-description">Description</Label>
@@ -963,7 +1002,7 @@ const ContactManagement = () => {
                     <Button variant="outline" onClick={() => setIsCreateGroupDialogOpen(false)}>
                       Cancel
                     </Button>
-                    <Button onClick={handleCreateGroup}>
+                    <Button onClick={handleCreateGroup} disabled={!!groupNameError}>
                       Create List
                     </Button>
                   </div>
@@ -1162,10 +1201,17 @@ const ContactManagement = () => {
                       <Input
                         id="new-list-name"
                         value={newListForImport.name}
-                        onChange={(e) => setNewListForImport({ ...newListForImport, name: e.target.value })}
+                        onChange={(e) => {
+                          setNewListForImport({ ...newListForImport, name: e.target.value });
+                          // Debounce the duplicate check
+                          setTimeout(() => checkGroupNameDuplicate(e.target.value), 500);
+                        }}
+                        className={`mt-1 ${groupNameError ? 'border-red-500' : ''}`}
                         placeholder="Enter list name"
-                        className="mt-1"
                       />
+                      {groupNameError && (
+                        <p className="text-sm text-red-500 mt-1">{groupNameError}</p>
+                      )}
                     </div>
                     <div>
                       <Label htmlFor="new-list-description">Description (Optional)</Label>
@@ -1182,7 +1228,7 @@ const ContactManagement = () => {
                       <Button
                         type="button"
                         onClick={handleCreateListForImport}
-                        disabled={!newListForImport.name.trim() || creatingListForImport}
+                        disabled={!newListForImport.name.trim() || creatingListForImport || !!groupNameError}
                         className="flex-1"
                       >
                         {creatingListForImport ? 'Creating...' : 'Create List'}

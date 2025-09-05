@@ -1,6 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 import FormData from 'form-data';
 
+// Helper function to get file extension based on media type
+function getFileExtension(mediaType) {
+  switch (mediaType) {
+    case 'image':
+      return 'jpg';
+    case 'video':
+      return 'mp4';
+    case 'audio':
+      return 'mp3';
+    case 'document':
+      return 'pdf';
+    default:
+      return 'bin';
+  }
+}
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -73,25 +89,8 @@ export default async function handler(req, res) {
       const buffer = Buffer.from(base64Data, 'base64');
       
       // Determine file extension based on media type
-      let extension = '';
-      switch (mediaType) {
-        case 'image':
-          extension = '.jpg';
-          break;
-        case 'video':
-          extension = '.mp4';
-          break;
-        case 'audio':
-          extension = '.mp3';
-          break;
-        case 'document':
-          extension = '.pdf';
-          break;
-        default:
-          extension = '.bin';
-      }
-      
-      formData.append('mediaFile', buffer, `${identifier}${extension}`);
+      const extension = getFileExtension(mediaType);
+      formData.append('mediaFile', buffer, `${identifier}.${extension}`);
     } else {
       // Handle file path or URL
       formData.append('mediaFile', mediaFile);

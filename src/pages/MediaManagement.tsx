@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useMedia } from '@/hooks/useMedia';
 import { useClientAuth } from '@/hooks/useClientAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,47 @@ const MediaManagement: React.FC = () => {
     mediaFile: null as File | null
   });
   const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [mediaNameError, setMediaNameError] = useState<string>('');
+  const [duplicateCheckTimeout, setDuplicateCheckTimeout] = useState<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (duplicateCheckTimeout) {
+        clearTimeout(duplicateCheckTimeout);
+      }
+    };
+  }, [duplicateCheckTimeout]);
+
+  // Duplicate check function
+  const checkMediaNameDuplicate = async (name: string) => {
+    if (!name.trim() || !client) {
+      setMediaNameError('');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('media')
+        .select('id')
+        .eq('name', name.trim())
+        .eq('client_id', client.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
+        console.error('Error checking media name:', error);
+        return;
+      }
+
+      if (data) {
+        setMediaNameError('A media file with this name already exists');
+      } else {
+        setMediaNameError('');
+      }
+    } catch (error) {
+      console.error('Error checking media name:', error);
+    }
+  };
 
   const filteredMedia = useMemo(() => {
     let filtered = media;
@@ -117,46 +159,53 @@ const MediaManagement: React.FC = () => {
       return;
     }
 
+    // Check file size (limit to 1.5MB to stay under Vercel's 4.5MB limit when base64 encoded)
+    const maxSize = 1.5 * 1024 * 1024; // 1.5MB
+    if (uploadForm.mediaFile.size > maxSize) {
+      toast.error('File size too large. Please select a file smaller than 1.5MB.');
+      return;
+    }
+
     setUploading(true);
 
     try {
-      // Convert file to base64
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const base64Data = e.target?.result as string;
+      // Use FormData like the working Postman call
+      const formData = new FormData();
+      formData.append('userid', client.user_id); // Note: 'userid' not 'userId'
+      formData.append('wabaNumber', client.whatsapp_number);
+      formData.append('output', 'json');
+      formData.append('mediaType', uploadForm.mediaType);
+      formData.append('identifier', uploadForm.identifier);
+      formData.append('description', uploadForm.description || '');
+      formData.append('mediaFile', uploadForm.mediaFile, '[PROXY]');
 
-        const response = await fetch('/api/upload-media', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            userId: client.user_id,
-            wabaNumber: client.whatsapp_number,
-            mediaType: uploadForm.mediaType,
-            identifier: uploadForm.identifier,
-            description: uploadForm.description,
-            mediaFile: base64Data
-          })
-        });
+      const response = await fetch('/api/upload-media', {
+        method: 'POST',
+        body: formData // Don't set Content-Type header, let browser set it with boundary
+      });
 
-        const data = await response.json();
+      const data = await response.json();
 
-                 if (response.ok && data.success) {
-           toast.success('Media uploaded successfully');
-           // Close dialog and refresh media list
-           setShowUploadDialog(false);
-           resetUploadForm();
-           await syncMediaWithDatabase();
-         } else {
-           console.error('Upload media error details:', data);
-           const errorMessage = data.error || 'Failed to upload media';
-           const details = data.details ? `\nDetails: ${data.details}` : '';
-           toast.error(`${errorMessage}${details}`);
-         }
-      };
-
-      reader.readAsDataURL(uploadForm.mediaFile);
+      if (response.ok && data.success) {
+        toast.success('Media uploaded successfully');
+        // Close dialog and refresh media list
+        setShowUploadDialog(false);
+        resetUploadForm();
+        await syncMediaWithDatabase();
+      } else {
+        console.error('Upload media error details:', data);
+        let errorMessage = data.error || 'Failed to upload media';
+        
+        // Handle specific error cases
+        if (response.status === 413) {
+          errorMessage = 'File too large. Please select a smaller file.';
+        } else if (response.status === 400) {
+          errorMessage = 'Invalid file format or missing required fields.';
+        }
+        
+        const details = data.details ? `\nDetails: ${data.details}` : '';
+        toast.error(`${errorMessage}${details}`);
+      }
     } catch (error) {
       console.error('Error uploading media:', error);
       toast.error('Failed to upload media. Please try again.');
@@ -302,8 +351,26 @@ const MediaManagement: React.FC = () => {
                        id="identifier"
                        placeholder="Enter media identifier"
                        value={uploadForm.identifier}
-                       onChange={(e) => setUploadForm(prev => ({ ...prev, identifier: e.target.value }))}
+                       onChange={(e) => {
+                         setUploadForm(prev => ({ ...prev, identifier: e.target.value }));
+                         
+                         // Clear previous timeout
+                         if (duplicateCheckTimeout) {
+                           clearTimeout(duplicateCheckTimeout);
+                         }
+                         
+                         // Set new timeout for duplicate check
+                         const timeout = setTimeout(() => {
+                           checkMediaNameDuplicate(e.target.value);
+                         }, 300);
+                         
+                         setDuplicateCheckTimeout(timeout);
+                       }}
+                       className={mediaNameError ? 'border-red-500' : ''}
                      />
+                     {mediaNameError && (
+                       <p className="text-sm text-red-500">{mediaNameError}</p>
+                     )}
                    </div>
                  </div>
                  <div className="space-y-2">
@@ -359,7 +426,7 @@ const MediaManagement: React.FC = () => {
                    </Button>
                                        <Button 
                       onClick={handleUploadMedia}
-                      disabled={uploading || !uploadForm.identifier || !uploadForm.mediaFile}
+                      disabled={uploading || !uploadForm.identifier || !uploadForm.mediaFile || !!mediaNameError}
                     >
                      {uploading ? (
                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
