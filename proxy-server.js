@@ -4,6 +4,7 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import { createClient } from '@supabase/supabase-js';
 import FormData from 'form-data';
+import multer from 'multer';
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL || "https://vvpamvhqdyanomqvtmiz.supabase.co",
@@ -13,9 +14,18 @@ const supabase = createClient(
 const app = express();
 const PORT = 3001;
 
+// Configure multer for file uploads
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
 // Enable CORS for all routes
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Function to log to file
 const logToFile = (message) => {
@@ -23,6 +33,27 @@ const logToFile = (message) => {
   const logMessage = `[${timestamp}] ${message}\n`;
   fs.appendFileSync('api-requests.log', logMessage);
   console.log(message);
+};
+
+// Helper functions for file handling
+const getFileExtension = (mediaType) => {
+  switch (mediaType) {
+    case 'image': return 'jpg';
+    case 'video': return 'mp4';
+    case 'audio': return 'mp3';
+    case 'document': return 'pdf';
+    default: return 'bin';
+  }
+};
+
+const getContentType = (mediaType) => {
+  switch (mediaType) {
+    case 'image': return 'image/jpeg';
+    case 'video': return 'video/mp4';
+    case 'audio': return 'audio/mpeg';
+    case 'document': return 'application/pdf';
+    default: return 'application/octet-stream';
+  }
 };
 
 // Proxy endpoint for media API
@@ -522,7 +553,7 @@ app.delete('/api/delete-template', async (req, res) => {
 });
 
 // Proxy endpoint for uploading media
-app.post('/api/upload-media', async (req, res) => {
+app.post('/api/upload-media', upload.single('mediaFile'), async (req, res) => {
   try {
     // Handle FormData fields (they come as userid, not userId)
     const userId = req.body.userid || req.body.userId;
@@ -530,7 +561,7 @@ app.post('/api/upload-media', async (req, res) => {
     const mediaType = req.body.mediaType;
     const identifier = req.body.identifier;
     const description = req.body.description;
-    const mediaFile = req.body.mediaFile;
+    const mediaFile = req.file; // Now using multer file object
     
     if (!userId || !wabaNumber || !mediaType || !identifier || !mediaFile) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -570,43 +601,15 @@ app.post('/api/upload-media', async (req, res) => {
       formData.append('description', description);
     }
 
-    // Handle media file - convert base64 to buffer
-    if (mediaFile.startsWith('data:')) {
-      // Handle base64 data URL
-      const base64Data = mediaFile.split(',')[1];
-      const buffer = Buffer.from(base64Data, 'base64');
-      
-      // Determine file extension based on media type
-      let extension = '';
-      switch (mediaType) {
-        case 'image':
-          extension = '.jpg';
-          break;
-        case 'video':
-          extension = '.mp4';
-          break;
-        case 'audio':
-          extension = '.mp3';
-          break;
-        case 'document':
-          extension = '.pdf';
-          break;
-        default:
-          extension = '.bin';
-      }
-      
-      // Append buffer directly to FormData using form-data library
-      formData.append('mediaFile', buffer, {
-        filename: `${identifier}${extension}`,
-        contentType: mediaType === 'image' ? 'image/jpeg' : 
-                    mediaType === 'video' ? 'video/mp4' : 
-                    mediaType === 'audio' ? 'audio/mpeg' : 
-                    mediaType === 'document' ? 'application/pdf' : 
-                    'application/octet-stream'
+    // Handle media file - now using multer file object
+    if (mediaFile && mediaFile.buffer) {
+      // Use the file buffer from multer
+      formData.append('mediaFile', mediaFile.buffer, {
+        filename: mediaFile.originalname || `${identifier}.${getFileExtension(mediaType)}`,
+        contentType: mediaFile.mimetype || getContentType(mediaType)
       });
     } else {
-      // Handle file path or URL
-      formData.append('mediaFile', mediaFile);
+      return res.status(400).json({ error: 'No file provided or invalid file format' });
     }
 
     const response = await fetch('https://theultimate.io/WAApi/media', {

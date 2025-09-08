@@ -82,12 +82,12 @@ export default async function handler(req, res) {
     }
 
     if (data.status === 'success') {
-      // Remove media from database
+      // Remove media from database - match by client_id (the current user) and media_id
       const { error: dbError } = await supabase
         .from('media')
         .delete()
-        .eq('whatsapp_media_id', mediaId)
-        .eq('user_id', userId);
+        .eq('media_id', mediaId)
+        .eq('client_id', userId);
 
       if (dbError) {
         console.error('Failed to remove media from database:', dbError);

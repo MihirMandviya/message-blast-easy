@@ -232,7 +232,7 @@ const MediaManagement: React.FC = () => {
         },
         body: JSON.stringify({
           userId: client.user_id,
-          mediaId: mediaItem.whatsapp_media_id
+          mediaId: mediaItem.media_id
         })
       });
 
@@ -257,7 +257,7 @@ const MediaManagement: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`/api/download-media?userId=${client.user_id}&mediaId=${mediaItem.whatsapp_media_id}`, {
+      const response = await fetch(`/api/download-media?userId=${client.user_id}&mediaId=${mediaItem.media_id}`, {
         method: 'GET'
       });
 
@@ -267,7 +267,7 @@ const MediaManagement: React.FC = () => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = mediaItem.name || `media_${mediaItem.whatsapp_media_id}`;
+        a.download = mediaItem.name || `media_${mediaItem.media_id}`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -584,9 +584,9 @@ const MediaManagement: React.FC = () => {
                   <Calendar className="h-3 w-3" />
                   <span>Created: {formatDate(mediaItem.created_at)}</span>
                 </div>
-                {mediaItem.whatsapp_media_id && (
+                {mediaItem.media_id && (
                   <div className="text-xs text-muted-foreground">
-                    ID: {mediaItem.whatsapp_media_id}
+                    ID: {mediaItem.media_id}
                   </div>
                 )}
               </div>

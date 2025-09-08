@@ -1,5 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import FormData from 'form-data';
+import formidable from 'formidable';
+import fs from 'fs';
 
 // Helper function to get file extension based on media type
 function getFileExtension(mediaType) {
@@ -22,6 +24,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Disable default body parser for multipart/form-data
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -39,7 +48,21 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { userId, wabaNumber, mediaType, identifier, description, mediaFile } = req.body;
+    // Parse multipart/form-data using formidable
+    const form = formidable({
+      maxFileSize: 10 * 1024 * 1024, // 10MB
+      keepExtensions: true,
+    });
+
+    const [fields, files] = await form.parse(req);
+    
+    // Extract fields (formidable returns arrays)
+    const userId = fields.userid?.[0] || fields.userId?.[0];
+    const wabaNumber = fields.wabaNumber?.[0];
+    const mediaType = fields.mediaType?.[0];
+    const identifier = fields.identifier?.[0];
+    const description = fields.description?.[0] || '';
+    const mediaFile = files.mediaFile?.[0];
 
     if (!userId || !wabaNumber || !mediaType || !identifier || !mediaFile) {
       return res.status(400).json({ 
@@ -53,6 +76,7 @@ export default async function handler(req, res) {
     console.log('Media Type:', mediaType);
     console.log('Identifier:', identifier);
     console.log('Description:', description);
+    console.log('File:', mediaFile.originalFilename, 'Size:', mediaFile.size);
     console.log('========================================');
 
     // Get client credentials from database
@@ -82,19 +106,10 @@ export default async function handler(req, res) {
       formData.append('description', description);
     }
 
-    // Handle media file - convert base64 to buffer
-    if (mediaFile.startsWith('data:')) {
-      // Handle base64 data URL
-      const base64Data = mediaFile.split(',')[1];
-      const buffer = Buffer.from(base64Data, 'base64');
-      
-      // Determine file extension based on media type
-      const extension = getFileExtension(mediaType);
-      formData.append('mediaFile', buffer, `${identifier}.${extension}`);
-    } else {
-      // Handle file path or URL
-      formData.append('mediaFile', mediaFile);
-    }
+    // Handle media file - read file and append to form data
+    const fileStream = fs.createReadStream(mediaFile.filepath);
+    const extension = getFileExtension(mediaType);
+    formData.append('mediaFile', fileStream, `${identifier}.${extension}`);
 
     // Make request to WhatsApp API
     const url = 'https://theultimate.io/WAApi/media';
@@ -113,6 +128,13 @@ export default async function handler(req, res) {
     console.log('WhatsApp API Response Status:', response.status);
     const responseText = await response.text();
     console.log('WhatsApp API Response Text:', responseText);
+
+    // Clean up temporary file
+    try {
+      fs.unlinkSync(mediaFile.filepath);
+    } catch (cleanupError) {
+      console.warn('Failed to clean up temporary file:', cleanupError);
+    }
 
     if (!response.ok) {
       return res.status(response.status).json({ 
