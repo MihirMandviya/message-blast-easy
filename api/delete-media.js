@@ -1,53 +1,37 @@
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Vercel serverless function for deleting media
+// This replaces the proxy server's /api/delete-media endpoint
 
 export default async function handler(req, res) {
-  // Set CORS headers
+  // Enable CORS with more comprehensive headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
 
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
+  // Only allow DELETE requests
   if (req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { userId, mediaId } = req.body;
+    const { userId, mediaId, apiKey } = req.body;
 
-    if (!userId || !mediaId) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: userId or mediaId' 
-      });
+    if (!userId || !mediaId || !apiKey) {
+      return res.status(400).json({ error: 'Missing userId, mediaId, or apiKey' });
     }
 
+    // Log request details (without sensitive data)
     console.log('=== DELETE MEDIA API REQUEST DETAILS ===');
-    console.log('User ID:', userId);
-    console.log('Media ID:', mediaId);
+    console.log(`User ID: ${userId}`);
+    console.log(`Media ID: ${mediaId}`);
+    console.log(`API Key: ***${apiKey.slice(-4)}`);
     console.log('========================================');
-
-    // Get API key from database
-    const { data: clientData, error: clientError } = await supabase
-      .from('client_users')
-      .select('whatsapp_api_key')
-      .eq('user_id', userId)
-      .single();
-
-    if (clientError || !clientData) {
-      console.error('Failed to get client API key:', clientError);
-      return res.status(400).json({ error: 'Failed to get client credentials' });
-    }
-
-    const apiKey = clientData.whatsapp_api_key;
 
     // Make request to WhatsApp API
     const url = `https://theultimate.io/WAApi/media?userid=${userId}&output=json&mediaId=${mediaId}`;
@@ -59,41 +43,18 @@ export default async function handler(req, res) {
       }
     });
 
-    console.log('WhatsApp API Response Status:', response.status);
-    const responseText = await response.text();
-    console.log('WhatsApp API Response Text:', responseText);
-
     if (!response.ok) {
+      const errorText = await response.text();
+      console.log(`API Error: ${errorText}`);
       return res.status(response.status).json({ 
-        error: 'Failed to delete media from WhatsApp API',
-        details: responseText
+        error: `HTTP error! status: ${response.status}`,
+        details: errorText
       });
     }
 
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('Failed to parse WhatsApp API response:', parseError);
-      return res.status(500).json({ 
-        error: 'Invalid response from WhatsApp API',
-        details: responseText
-      });
-    }
-
+    const data = await response.json();
+    
     if (data.status === 'success') {
-      // Remove media from database - match by client_id (the current user) and media_id
-      const { error: dbError } = await supabase
-        .from('media')
-        .delete()
-        .eq('media_id', mediaId)
-        .eq('client_id', userId);
-
-      if (dbError) {
-        console.error('Failed to remove media from database:', dbError);
-        // Don't fail the request, just log the error
-      }
-
       return res.json({ 
         success: true, 
         message: 'Media deleted successfully', 

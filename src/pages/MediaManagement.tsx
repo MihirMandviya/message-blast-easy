@@ -169,19 +169,28 @@ const MediaManagement: React.FC = () => {
     setUploading(true);
 
     try {
-      // Use FormData like the working Postman call
-      const formData = new FormData();
-      formData.append('userid', client.user_id); // Note: 'userid' not 'userId'
-      formData.append('wabaNumber', client.whatsapp_number);
-      formData.append('output', 'json');
-      formData.append('mediaType', uploadForm.mediaType);
-      formData.append('identifier', uploadForm.identifier);
-      formData.append('description', uploadForm.description || '');
-      formData.append('mediaFile', uploadForm.mediaFile, '[PROXY]');
+      // Convert file to base64 for JSON transmission
+      const fileReader = new FileReader();
+      const base64File = await new Promise((resolve, reject) => {
+        fileReader.onload = () => resolve(fileReader.result);
+        fileReader.onerror = reject;
+        fileReader.readAsDataURL(uploadForm.mediaFile);
+      });
 
       const response = await fetch('/api/upload-media', {
         method: 'POST',
-        body: formData // Don't set Content-Type header, let browser set it with boundary
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: client.user_id,
+          apiKey: client.whatsapp_api_key,
+          wabaNumber: client.whatsapp_number,
+          mediaType: uploadForm.mediaType,
+          identifier: uploadForm.identifier,
+          description: uploadForm.description || '',
+          mediaFile: base64File
+        })
       });
 
       const data = await response.json();
@@ -232,7 +241,8 @@ const MediaManagement: React.FC = () => {
         },
         body: JSON.stringify({
           userId: client.user_id,
-          mediaId: mediaItem.media_id
+          mediaId: mediaItem.media_id,
+          apiKey: client.whatsapp_api_key
         })
       });
 
@@ -257,7 +267,7 @@ const MediaManagement: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`/api/download-media?userId=${client.user_id}&mediaId=${mediaItem.media_id}`, {
+      const response = await fetch(`/api/download-media?userId=${client.user_id}&mediaId=${mediaItem.media_id}&apiKey=${client.whatsapp_api_key}`, {
         method: 'GET'
       });
 
