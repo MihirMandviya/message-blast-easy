@@ -45,7 +45,7 @@ export interface ReportFilters {
 }
 
 export const useReports = () => {
-  const { client } = useClientAuth();
+  const { client, getOriginalClientCredentials } = useClientAuth();
   const [reports, setReports] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,18 +56,25 @@ export const useReports = () => {
       return;
     }
 
-         try {
-       setIsLoading(true);
-       setError(null);
+    try {
+      setIsLoading(true);
+      setError(null);
 
-       const requestBody = {
-         userId: client.user_id,
-         fromDate: filters.fromDate || '',
-         toDate: filters.toDate || '',
-         mobileNo: filters.mobileNo || '',
-         pageLimit: filters.pageLimit || 100,
-         startCursor: filters.startCursor || '1'
-       };
+      // Get original client credentials for API calls
+      const originalCredentials = await getOriginalClientCredentials();
+      if (!originalCredentials) {
+        setError('Unable to fetch client credentials');
+        return;
+      }
+
+      const requestBody = {
+        userId: originalCredentials.user_id, // Use original client's user_id
+        fromDate: filters.fromDate || '',
+        toDate: filters.toDate || '',
+        mobileNo: filters.mobileNo || '',
+        pageLimit: filters.pageLimit || 100,
+        startCursor: filters.startCursor || '1'
+      };
 
        console.log('Reports API Request Body:', requestBody);
 

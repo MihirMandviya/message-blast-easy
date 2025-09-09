@@ -473,7 +473,8 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
           name: newListName.trim(),
           description: newListDescription.trim(),
           client_id: client.id,
-          user_id: client.id // Use client.id (client_users.id) for RLS policy
+          user_id: client.id, // Use client.id (client_users.id) for RLS policy
+          created_by: client.id // Track who created this contact list
         })
         .select()
         .single();
@@ -860,7 +861,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
         target_groups: [groupId],
         user_id: client?.client_id, // Use client_id to reference clients table
         client_id: client?.id, // Use client_users.id for client_id
-        added_by: client?.id, // Use client_users.id for added_by
+        created_by: client?.id, // Use client_users.id for created_by (who created this campaign)
         group_id: groupId,
         template_id: formData.template_id,
         status: campaignStatus,

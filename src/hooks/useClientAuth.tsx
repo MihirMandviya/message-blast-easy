@@ -40,6 +40,7 @@ interface ClientAuthContextType {
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   debugSession: () => void;
+  getOriginalClientCredentials: () => Promise<{ user_id: string; api_key: string; whatsapp_number: string; password: string } | null>;
 }
 
 const ClientAuthContext = createContext<ClientAuthContextType | undefined>(undefined);
@@ -246,6 +247,34 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const getOriginalClientCredentials = async () => {
+    if (!client?.client_id) return null;
+
+    try {
+      // Get the original client credentials from the clients table
+      const { data, error } = await supabase
+        .from('clients')
+        .select('user_id, api_key, wt_business_no, password')
+        .eq('id', client.client_id)
+        .single();
+
+      if (error || !data) {
+        console.error('Error fetching original client credentials:', error);
+        return null;
+      }
+
+      return {
+        user_id: data.user_id,
+        api_key: data.api_key,
+        whatsapp_number: data.wt_business_no,
+        password: data.password
+      };
+    } catch (error) {
+      console.error('Error fetching original client credentials:', error);
+      return null;
+    }
+  };
+
   return (
     <ClientAuthContext.Provider value={{
       client,
@@ -254,7 +283,8 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
       signIn,
       signOut,
       isAuthenticated,
-      debugSession
+      debugSession,
+      getOriginalClientCredentials
     }}>
       {children}
     </ClientAuthContext.Provider>

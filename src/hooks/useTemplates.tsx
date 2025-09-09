@@ -42,7 +42,7 @@ interface DatabaseTemplate {
 }
 
 export const useTemplates = () => {
-  const { client } = useClientAuth();
+  const { client, getOriginalClientCredentials } = useClientAuth();
   const [templates, setTemplates] = useState<DatabaseTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,39 +50,20 @@ export const useTemplates = () => {
 
   const fetchTemplatesFromAPI = useCallback(async () => {
     console.log('Client data for templates:', client);
-    console.log('User ID:', client?.user_id);
-    console.log('WhatsApp API Key:', client?.whatsapp_api_key ? 'Present' : 'Missing');
-    console.log('WhatsApp Number:', client?.whatsapp_number);
     
-    // If user_id is not available, try to get it from the database
-    let userId = client?.user_id;
-    let apiKey = client?.whatsapp_api_key;
-    let wabaNumber = client?.whatsapp_number;
-    
-    if (!userId || !apiKey || !wabaNumber) {
-      if (client?.id) {
-        try {
-          const { data, error } = await supabase
-            .from('client_users')
-            .select('user_id, whatsapp_api_key, whatsapp_number')
-            .eq('id', client.id)
-            .single();
-          
-          if (!error && data) {
-            userId = data.user_id;
-            apiKey = data.whatsapp_api_key;
-            wabaNumber = data.whatsapp_number;
-            console.log('Retrieved credentials from database:', { 
-              userId, 
-              apiKey: apiKey ? 'Present' : 'Missing', 
-              wabaNumber 
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching credentials:', error);
-        }
-      }
+    // Get original client credentials for API calls
+    const originalCredentials = await getOriginalClientCredentials();
+    if (!originalCredentials) {
+      setError('Unable to fetch client credentials');
+      return;
     }
+
+    const { user_id: userId, api_key: apiKey, whatsapp_number: wabaNumber } = originalCredentials;
+    console.log('Using original client credentials:', {
+      userId,
+      apiKey: apiKey ? 'Present' : 'Missing',
+      wabaNumber
+    });
     
     if (!userId || !apiKey || !wabaNumber) {
       setError(`API credentials not available. User ID: ${!!userId}, API Key: ${!!apiKey}, WABA Number: ${!!wabaNumber}`);

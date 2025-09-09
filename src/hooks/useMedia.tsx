@@ -35,7 +35,7 @@ interface DatabaseMedia {
 }
 
 export const useMedia = () => {
-  const { client } = useClientAuth();
+  const { client, getOriginalClientCredentials } = useClientAuth();
   const [media, setMedia] = useState<DatabaseMedia[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,41 +43,23 @@ export const useMedia = () => {
 
   const fetchMediaFromAPI = useCallback(async () => {
     console.log('Client data:', client);
-    console.log('WhatsApp API Key:', client?.whatsapp_api_key);
-    console.log('User ID:', client?.user_id);
     
-    // If user_id is not available, try to get it from the database
-    let userId = client?.user_id;
-    if (!userId && client?.id) {
-      try {
-        const { data, error } = await supabase
-          .from('client_users')
-          .select('user_id')
-          .eq('id', client.id)
-          .single();
-        
-        if (!error && data?.user_id) {
-          userId = data.user_id;
-          console.log('Retrieved user_id from database:', userId);
-          
-          // Update the client data in localStorage with the missing user_id
-          const storedSession = localStorage.getItem('client_session');
-          if (storedSession) {
-            const parsedSession = JSON.parse(storedSession);
-            if (parsedSession.client) {
-              parsedSession.client.user_id = userId;
-              localStorage.setItem('client_session', JSON.stringify(parsedSession));
-              console.log('Updated client session with user_id');
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching user_id:', error);
-      }
+    // Get original client credentials for API calls
+    const originalCredentials = await getOriginalClientCredentials();
+    if (!originalCredentials) {
+      setError('Unable to fetch client credentials');
+      return;
     }
+
+    const { user_id: userId, api_key: apiKey, whatsapp_number: wabaNumber } = originalCredentials;
+    console.log('Using original client credentials:', {
+      userId,
+      apiKey: apiKey ? 'Present' : 'Missing',
+      wabaNumber
+    });
     
-    if (!client?.whatsapp_api_key || !userId) {
-      setError(`API credentials not available. API Key: ${!!client?.whatsapp_api_key}, User ID: ${!!userId}`);
+    if (!apiKey || !userId) {
+      setError(`API credentials not available. API Key: ${!!apiKey}, User ID: ${!!userId}`);
       return null;
     }
 
@@ -92,7 +74,7 @@ export const useMedia = () => {
         },
         body: JSON.stringify({
           userId: userId,
-          apiKey: client.whatsapp_api_key
+          apiKey: apiKey // Use original client's API key
         })
       });
 

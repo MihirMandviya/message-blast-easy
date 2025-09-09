@@ -503,7 +503,8 @@ const ContactManagement = () => {
           name: newListForImport.name.trim(),
           description: newListForImport.description.trim() || null,
           user_id: client.id,
-          client_id: client.id
+          client_id: client.id,
+          created_by: client.id // Track who created this contact list
         }])
         .select()
         .single();

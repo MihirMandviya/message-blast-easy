@@ -22,13 +22,26 @@ interface WalletResponse {
 }
 
 export const useWalletBalance = () => {
-  const { client } = useClientAuth();
+  const { client, getOriginalClientCredentials } = useClientAuth();
   const [balance, setBalance] = useState<WalletBalance | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchWalletBalance = async () => {
-    if (!client?.user_id || !client?.whatsapp_api_key) {
+    if (!client) {
+      setError('User not authenticated');
+      return;
+    }
+
+    // Get original client credentials for API calls
+    const originalCredentials = await getOriginalClientCredentials();
+    if (!originalCredentials) {
+      setError('Unable to fetch client credentials');
+      return;
+    }
+
+    const { user_id: userId, api_key: apiKey } = originalCredentials;
+    if (!userId || !apiKey) {
       setError('Missing credentials');
       return;
     }
@@ -43,8 +56,8 @@ export const useWalletBalance = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId: client.user_id,
-          apiKey: client.whatsapp_api_key
+          userId: userId, // Use original client's user_id
+          apiKey: apiKey  // Use original client's API key
         })
       });
 
