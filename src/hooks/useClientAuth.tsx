@@ -97,6 +97,7 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
                     parsedSession.client = data;
                     localStorage.setItem('client_session', JSON.stringify(parsedSession));
                     console.log('Refreshed client session with complete data and database token');
+
                   }
                 } catch (error) {
                   console.error('Error refreshing client data:', error);
@@ -146,6 +147,7 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
         setIsLoading(false);
         return { error: 'Invalid email or password' };
       }
+
 
       // Check for existing valid session first
       const { data: existingSession, error: sessionCheckError } = await supabase
@@ -218,6 +220,7 @@ export const ClientAuthProvider = ({ children }: { children: ReactNode }) => {
         .delete()
         .eq('id', session.session_id);
     }
+    
     
     setClient(null);
     setSession(null);

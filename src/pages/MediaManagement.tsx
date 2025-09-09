@@ -169,28 +169,20 @@ const MediaManagement: React.FC = () => {
     setUploading(true);
 
     try {
-      // Convert file to base64 for JSON transmission
-      const fileReader = new FileReader();
-      const base64File = await new Promise((resolve, reject) => {
-        fileReader.onload = () => resolve(fileReader.result);
-        fileReader.onerror = reject;
-        fileReader.readAsDataURL(uploadForm.mediaFile);
-      });
+      // Use FormData for proper file upload through proxy server
+      const formData = new FormData();
+      formData.append('userid', client.user_id);
+      formData.append('wabaNumber', client.whatsapp_number);
+      formData.append('output', 'json');
+      formData.append('mediaType', uploadForm.mediaType);
+      formData.append('identifier', uploadForm.identifier);
+      formData.append('description', uploadForm.description || '');
+      formData.append('mediaFile', uploadForm.mediaFile);
 
-      const response = await fetch('/api/upload-media', {
+      // Make request to proxy server (not Vercel API)
+      const response = await fetch('http://localhost:3001/api/upload-media', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: client.user_id,
-          apiKey: client.whatsapp_api_key,
-          wabaNumber: client.whatsapp_number,
-          mediaType: uploadForm.mediaType,
-          identifier: uploadForm.identifier,
-          description: uploadForm.description || '',
-          mediaFile: base64File
-        })
+        body: formData // Don't set Content-Type header, let browser set it with boundary
       });
 
       const data = await response.json();
@@ -234,15 +226,14 @@ const MediaManagement: React.FC = () => {
     }
 
     try {
-      const response = await fetch('/api/delete-media', {
+      const response = await fetch('http://localhost:3001/api/delete-media', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           userId: client.user_id,
-          mediaId: mediaItem.media_id,
-          apiKey: client.whatsapp_api_key
+          mediaId: mediaItem.media_id
         })
       });
 
@@ -267,7 +258,7 @@ const MediaManagement: React.FC = () => {
     }
 
     try {
-      const response = await fetch(`/api/download-media?userId=${client.user_id}&mediaId=${mediaItem.media_id}&apiKey=${client.whatsapp_api_key}`, {
+      const response = await fetch(`http://localhost:3001/api/download-media?userId=${client.user_id}&mediaId=${mediaItem.media_id}`, {
         method: 'GET'
       });
 
