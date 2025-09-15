@@ -339,56 +339,56 @@ app.post('/api/create-template', async (req, res) => {
 
     // Build form data using FormData for multipart/form-data
     const formData = new FormData();
+    
+    // Add required fields (matching your API request format)
     formData.append('userid', userId);
-    formData.append('password', password);
     formData.append('wabaNumber', wabaNumber);
     formData.append('output', 'json');
     formData.append('templateName', templateName);
     
-    if (templateDescription) formData.append('templateDescription', templateDescription);
-    if (language) formData.append('language', language);
-    if (category) formData.append('category', category);
-    if (msgType) formData.append('msgType', msgType);
-    if (header) formData.append('header', header);
-    if (body) formData.append('body', body);
-    if (footer) formData.append('footer', footer);
-    if (headerSample) formData.append('headerSample', headerSample);
-    if (bodySample) formData.append('bodySample', bodySample);
-    if (buttons) formData.append('buttons', JSON.stringify(buttons));
-    if (mediaType) formData.append('mediaType', mediaType);
+    // Add optional fields with proper defaults
+    formData.append('templateDescription', templateDescription || templateName);
+    formData.append('language', language || 'en');
+    formData.append('category', category || 'MARKETING');
+    formData.append('msgType', msgType || 'text');
     
-                   // For media templates, include mediaUrl parameter only if provided
-      if (msgType === 'media') {
-        const headerFile = req.body.headerFile;
-        logToFile(`Processing media template with headerFile: ${headerFile}`);
-        if (headerFile && headerFile.trim()) {
-                     // Extract mediaId from the URL if it's a download URL
-           const urlMatch = headerFile.match(/mediaId=(\d+)/);
-           logToFile('URL match result: ' + JSON.stringify(urlMatch));
-           if (urlMatch && urlMatch[1]) {
-             const mediaId = urlMatch[1];
-             formData.append('mediaId', mediaId);
-             logToFile(`Media template - mediaId added: ${mediaId}`);
-           } else {
-             // If it's a direct URL, use mediaUrl
-             formData.append('mediaUrl', headerFile.trim());
-             logToFile(`Media template - mediaUrl added: ${headerFile.trim()}`);
-           }
-          
-          // Debug: Log all FormData entries
-          logToFile('=== FORM DATA CONTENTS ===');
-          for (let [key, value] of formData.entries()) {
-            logToFile(`${key}: ${value}`);
-          }
-          logToFile('==========================');
-        } else {
-          logToFile('Media template - no headerFile provided, this will cause an error');
-          return res.status(400).json({ 
-            error: 'Missing headerFile for media template',
-            details: 'Media templates require a headerFile parameter'
-          });
-        }
+    // Add template content
+    if (body) formData.append('body', body);
+    if (bodySample) formData.append('bodySample', bodySample);
+    if (footer) formData.append('footer', footer);
+    
+    // Handle media templates (matching your API request structure)
+    if (msgType === 'media') {
+      const headerSampleFile = req.body.headerSampleFile || req.body.headerFile;
+      
+      logToFile(`Processing media template with headerSampleFile: ${headerSampleFile}`);
+      
+      if (!headerSampleFile || !headerSampleFile.trim()) {
+        logToFile('Media template - no headerSampleFile provided, this will cause an error');
+        return res.status(400).json({ 
+          error: 'Missing headerSampleFile for media template',
+          details: 'Media templates require a headerSampleFile parameter (URL to the media file)'
+        });
       }
+      
+      // Add media-specific fields (matching your API format)
+      formData.append('mediaType', mediaType || 'image');
+      formData.append('headerSampleFile', headerSampleFile.trim());
+      
+      logToFile(`Media template - headerSampleFile added: ${headerSampleFile.trim()}`);
+      logToFile(`Media template - mediaType added: ${mediaType || 'image'}`);
+    }
+    
+    // Handle interactive templates with buttons
+    if (buttons) {
+      formData.append('buttons', JSON.stringify(buttons));
+    }
+    
+    // Debug: Log all FormData entries
+    logToFile('=== FORM DATA CONTENTS ===');
+    // Note: form-data library doesn't have entries() method like browser FormData
+    logToFile('FormData created successfully with media template fields');
+    logToFile('==========================');
 
     const response = await fetch('https://theultimate.io/WAApi/template', {
       method: 'POST',
@@ -671,7 +671,7 @@ app.post('/api/upload-media', upload.single('mediaFile'), async (req, res) => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'name,user_id'
+          onConflict: 'name' // Use the correct constraint name
         });
 
       if (dbError) {
@@ -871,6 +871,34 @@ app.post('/api/fetch-wallet-balance', async (req, res) => {
       details: error.message
     });
   }
+});
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK', 
+    message: 'Proxy server is running',
+    timestamp: new Date().toISOString(),
+    port: PORT 
+  });
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Message Blast Easy Proxy Server',
+    status: 'running',
+    endpoints: [
+      'GET /health',
+      'POST /api/create-template',
+      'DELETE /api/delete-template',
+      'POST /api/upload-media',
+      'POST /api/fetch-templates',
+      'POST /api/fetch-media',
+      'POST /api/fetch-reports',
+      'POST /api/wallet-balance'
+    ]
+  });
 });
 
 app.listen(PORT, () => {

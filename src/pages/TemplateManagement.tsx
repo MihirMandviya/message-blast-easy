@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 
 const TemplateManagement: React.FC = () => {
   const { templates, isLoading, error, lastSync, syncTemplatesWithDatabase, getTemplatesByCategory, getTemplatesByLanguage, getTemplatesByMediaType } = useTemplates();
-  const { client, session } = useClientAuth();
+  const { client, session, getOriginalClientCredentials } = useClientAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
@@ -122,36 +122,18 @@ const TemplateManagement: React.FC = () => {
     }
 
     try {
-      // Always fetch password from database to ensure we get the correct password field
-      console.log('🔍 Fetching password from database...');
-      const { data: clientData, error } = await supabase
-        .from('client_users')
-        .select('password')
-        .eq('id', client.id)
-        .single();
-      
-      if (error || !clientData) {
-        toast.error('Failed to get client credentials');
-        return;
-      }
-      
-      // Get the actual password from the database
-      const password = clientData.password;
-      console.log('🔍 Using password from database');
-
-      // Get the correct user_id - try different possible fields
-      const userId = client.user_id || client.id || client.user_id_string;
-      
-      if (!userId) {
-        toast.error('User ID not found in client data');
+      // Get original client credentials for API calls
+      const originalCredentials = await getOriginalClientCredentials();
+      if (!originalCredentials) {
+        toast.error('Unable to fetch client credentials');
         return;
       }
 
       // Debug: Log the client data being sent
       console.log('🔍 Delete template request data:', {
-        userId: userId,
-        password: password ? '***' + password.slice(-4) : 'NOT_SET',
-        wabaNumber: client.whatsapp_number,
+        userId: originalCredentials.user_id,
+        password: originalCredentials.password ? '***' + originalCredentials.password.slice(-4) : 'NOT_SET',
+        wabaNumber: originalCredentials.whatsapp_number,
         templateName: template.template_name,
         language: template.language
       });
@@ -162,9 +144,9 @@ const TemplateManagement: React.FC = () => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId: userId,
-          password: password,
-          wabaNumber: client.whatsapp_number,
+          userId: originalCredentials.user_id, // Use original client's user_id
+          password: originalCredentials.password, // Use original client's password
+          wabaNumber: originalCredentials.whatsapp_number, // Use original client's WhatsApp number
           templateName: template.template_name,
           language: template.language
         })

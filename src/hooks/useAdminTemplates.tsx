@@ -239,6 +239,7 @@ export const useAdminTemplates = () => {
           userId: client.user_id,
           password: clientData.password,
           wabaNumber: client.whatsapp_number,
+          apiKey: client.whatsapp_api_key,
           ...templateData
         })
       });

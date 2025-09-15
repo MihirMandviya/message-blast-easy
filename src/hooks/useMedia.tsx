@@ -135,30 +135,36 @@ export const useMedia = () => {
         throw error;
       }
 
-      // Clear all existing media for this user first
-      await supabase
+      // First, get existing media records to preserve their added_by field
+      const { data: existingMedia } = await supabase
         .from('media')
-        .delete()
-        .eq('client_id', client.id);
+        .select('name, added_by')
+        .eq('user_id', clientOrgId);
 
-      // Prepare media data with unique names to avoid conflicts
-      const mediaToInsert = apiMedia.map((item, index) => ({
+      const existingMediaMap = new Map(existingMedia?.map(item => [item.name, item.added_by]) || []);
+
+      // Prepare media data for upsert (update or insert)
+      const mediaToUpsert = apiMedia.map((item, index) => ({
         user_id: clientOrgId, // Use the organization/client ID
         client_id: client.id, // Use the current client_user ID
-        added_by: client.id, // Set added_by to the current client user
+        added_by: existingMediaMap.get(item.identifier) || '309a3786-c8bd-409d-8176-7f9964a37d06', // Preserve existing added_by or use primary user for new items
         name: item.identifier,
         creation_time: item.creationTime,
         description: item.description,
         media_type: item.mediaType,
         media_id: item.mediaId,
         status: item.status,
-        waba_number: item.wabaNumber
+        waba_number: item.wabaNumber,
+        updated_at: new Date().toISOString()
       }));
 
-      // Insert new media data
+      // Use upsert to handle existing records with the same name
       const { data, error } = await supabase
         .from('media')
-        .insert(mediaToInsert)
+        .upsert(mediaToUpsert, { 
+          onConflict: 'name',
+          ignoreDuplicates: false 
+        })
         .select();
 
       if (error) {

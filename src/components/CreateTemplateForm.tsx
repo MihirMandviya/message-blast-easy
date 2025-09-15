@@ -29,7 +29,7 @@ interface CreateTemplateFormProps {
 }
 
 const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCancel }) => {
-  const { client, isLoading: clientLoading } = useClientAuth();
+  const { client, isLoading: clientLoading, getOriginalClientCredentials } = useClientAuth();
   const { media, isLoading: mediaLoading, syncMediaWithDatabase } = useMedia();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -143,10 +143,17 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
     }
   };
 
-  const handleMediaSelect = (mediaId: string) => {
+  const handleMediaSelect = async (mediaId: string) => {
     const selectedMedia = media.find(item => item.media_id === mediaId);
     if (selectedMedia) {
-      const mediaUrl = `https://theultimate.io/WAApi/media/download?userid=${client?.user_id}&mediaId=${mediaId}`;
+      // Get original client credentials for media URL
+      const originalCredentials = await getOriginalClientCredentials();
+      if (!originalCredentials) {
+        toast.error('Unable to fetch client credentials');
+        return;
+      }
+
+      const mediaUrl = `https://theultimate.io/WAApi/media/download?userid=${originalCredentials.user_id}&mediaId=${mediaId}`;
       
       setSelectedMediaId(mediaId);
       setHeaderFileUrl(mediaUrl);
@@ -238,7 +245,7 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
           return;
         }
 
-        requestBody.headerFile = headerFileUrl.trim();
+        requestBody.headerSampleFile = headerFileUrl.trim();
       }
 
       // Add buttons

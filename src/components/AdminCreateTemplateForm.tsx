@@ -174,7 +174,7 @@ const AdminCreateTemplateForm: React.FC<AdminCreateTemplateFormProps> = ({ onSuc
         bodySample: bodySample.trim() || undefined,
         buttons: buttons.length > 0 ? buttons : undefined,
         mediaType: msgType === 'media' ? mediaType : undefined,
-        headerFile: headerFileUrl.trim() || undefined
+        headerSampleFile: headerFileUrl.trim() || undefined
       };
 
       await createTemplateForClient(clientId, templateData);

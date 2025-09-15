@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 
 const MediaManagement: React.FC = () => {
   const { media, isLoading, error, lastSync, syncMediaWithDatabase } = useMedia();
-  const { client } = useClientAuth();
+  const { client, getOriginalClientCredentials } = useClientAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMediaType, setSelectedMediaType] = useState<string>('all');
   const [uploading, setUploading] = useState(false);
@@ -169,10 +169,17 @@ const MediaManagement: React.FC = () => {
     setUploading(true);
 
     try {
+      // Get original client credentials for API calls
+      const originalCredentials = await getOriginalClientCredentials();
+      if (!originalCredentials) {
+        toast.error('Unable to fetch client credentials');
+        return;
+      }
+
       // Use FormData for proper file upload through proxy server
       const formData = new FormData();
-      formData.append('userid', client.user_id);
-      formData.append('wabaNumber', client.whatsapp_number);
+      formData.append('userid', originalCredentials.user_id); // Use original client's user_id
+      formData.append('wabaNumber', originalCredentials.whatsapp_number); // Use original client's WhatsApp number
       formData.append('output', 'json');
       formData.append('mediaType', uploadForm.mediaType);
       formData.append('identifier', uploadForm.identifier);
@@ -226,13 +233,20 @@ const MediaManagement: React.FC = () => {
     }
 
     try {
+      // Get original client credentials for API calls
+      const originalCredentials = await getOriginalClientCredentials();
+      if (!originalCredentials) {
+        toast.error('Unable to fetch client credentials');
+        return;
+      }
+
       const response = await fetch('http://localhost:3001/api/delete-media', {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId: client.user_id,
+          userId: originalCredentials.user_id, // Use original client's user_id
           mediaId: mediaItem.media_id
         })
       });
