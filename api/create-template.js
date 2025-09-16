@@ -97,11 +97,10 @@ export default async function handler(req, res) {
         console.log(`Media template - mediaType added: ${mediaType || 'image'}`);
         console.log(`Media template - headerSampleFile added: ${headerSampleFileValue.trim()}`);
         
-        // Debug: Log all FormData entries
+        // Debug: Log FormData creation (form-data library doesn't have entries() method)
         console.log('=== FORM DATA CONTENTS ===');
-        for (let [key, value] of formData.entries()) {
-          console.log(`${key}: ${value}`);
-        }
+        console.log('FormData created successfully with media template fields');
+        console.log(`FormData fields added for ${msgType} template`);
         console.log('==========================');
       } else {
         console.log('Media template - no headerSampleFile provided, this will cause an error');

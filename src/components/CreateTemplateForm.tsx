@@ -254,7 +254,7 @@ const CreateTemplateForm: React.FC<CreateTemplateFormProps> = ({ onSuccess, onCa
       }
 
 
-      const response = await fetch('/api/create-template', {
+      const response = await fetch('http://localhost:3001/api/create-template', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
