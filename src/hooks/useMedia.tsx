@@ -143,8 +143,20 @@ export const useMedia = () => {
 
       const existingMediaMap = new Map(existingMedia?.map(item => [item.name, item.added_by]) || []);
 
+      // Deduplicate API media by identifier to prevent conflict errors
+      const uniqueApiMedia = apiMedia.reduce((unique: any[], current: any) => {
+        const existingIndex = unique.findIndex(item => item.identifier === current.identifier);
+        if (existingIndex === -1) {
+          unique.push(current);
+        } else {
+          // Keep the most recent one (or you could merge them based on your logic)
+          unique[existingIndex] = current;
+        }
+        return unique;
+      }, []);
+
       // Prepare media data for upsert (update or insert)
-      const mediaToUpsert = apiMedia.map((item, index) => ({
+      const mediaToUpsert = uniqueApiMedia.map((item, index) => ({
         user_id: clientOrgId, // Use the organization/client ID
         client_id: client.id, // Use the current client_user ID
         added_by: existingMediaMap.get(item.identifier) || '309a3786-c8bd-409d-8176-7f9964a37d06', // Preserve existing added_by or use primary user for new items

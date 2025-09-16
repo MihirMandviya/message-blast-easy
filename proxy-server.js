@@ -335,6 +335,9 @@ app.post('/api/create-template', async (req, res) => {
     logToFile(`Footer: ${footer}`);
     logToFile(`Buttons: ${buttons ? JSON.stringify(buttons) : 'NONE'}`);
     logToFile(`Media Type: ${mediaType}`);
+    logToFile(`Header Sample File: ${headerSampleFile}`);
+    logToFile(`Header File: ${headerFile}`);
+    logToFile(`Full Request Body: ${JSON.stringify(req.body, null, 2)}`);
     logToFile('==========================================');
 
     // Build form data using FormData for multipart/form-data
@@ -384,10 +387,10 @@ app.post('/api/create-template', async (req, res) => {
       formData.append('buttons', JSON.stringify(buttons));
     }
     
-    // Debug: Log all FormData entries
+    // Debug: Log FormData creation
     logToFile('=== FORM DATA CONTENTS ===');
-    // Note: form-data library doesn't have entries() method like browser FormData
     logToFile('FormData created successfully with media template fields');
+    logToFile(`FormData fields added for ${msgType} template`);
     logToFile('==========================');
 
     const response = await fetch('https://theultimate.io/WAApi/template', {
