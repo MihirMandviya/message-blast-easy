@@ -1,6 +1,9 @@
 // Vercel serverless function for creating templates
 // This replaces the proxy server's /api/create-template endpoint
 
+import fetch from 'node-fetch';
+import FormData from 'form-data';
+
 export default async function handler(req, res) {
   // Enable CORS with more comprehensive headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -80,24 +83,19 @@ export default async function handler(req, res) {
     if (headerSample) formData.append('headerSample', headerSample);
     if (bodySample) formData.append('bodySample', bodySample);
     if (buttons) formData.append('buttons', JSON.stringify(buttons));
-    if (mediaType) formData.append('mediaType', mediaType);
     
-    // For media templates, include mediaUrl parameter only if provided
+    // For media templates, include headerSampleFile parameter (matching WhatsApp API spec)
     if (msgType === 'media') {
-      console.log('Processing media template with headerFile:', headerFile);
-      if (headerFile && headerFile.trim()) {
-        // Extract mediaId from the URL if it's a download URL
-        const urlMatch = headerFile.match(/mediaId=(\d+)/);
-        console.log('URL match result:', urlMatch);
-        if (urlMatch && urlMatch[1]) {
-          const mediaId = urlMatch[1];
-          formData.append('mediaId', mediaId);
-          console.log(`Media template - mediaId added: ${mediaId}`);
-        } else {
-          // If it's a direct URL, use mediaUrl
-          formData.append('mediaUrl', headerFile.trim());
-          console.log(`Media template - mediaUrl added: ${headerFile.trim()}`);
-        }
+      const headerSampleFileValue = headerSampleFile || headerFile; // Support both field names for backward compatibility
+      console.log('Processing media template with headerSampleFile:', headerSampleFileValue);
+      
+      if (headerSampleFileValue && headerSampleFileValue.trim()) {
+        // Add media-specific fields (matching the working curl format)
+        formData.append('mediaType', mediaType || 'image');
+        formData.append('headerSampleFile', headerSampleFileValue.trim());
+        
+        console.log(`Media template - mediaType added: ${mediaType || 'image'}`);
+        console.log(`Media template - headerSampleFile added: ${headerSampleFileValue.trim()}`);
         
         // Debug: Log all FormData entries
         console.log('=== FORM DATA CONTENTS ===');
@@ -106,10 +104,10 @@ export default async function handler(req, res) {
         }
         console.log('==========================');
       } else {
-        console.log('Media template - no headerFile provided, this will cause an error');
+        console.log('Media template - no headerSampleFile provided, this will cause an error');
         return res.status(400).json({ 
-          error: 'Missing headerFile for media template',
-          details: 'Media templates require a headerFile parameter'
+          error: 'Missing headerSampleFile for media template',
+          details: 'Media templates require a headerSampleFile parameter (URL to the media file)'
         });
       }
     }
