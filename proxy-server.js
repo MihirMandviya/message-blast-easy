@@ -340,27 +340,27 @@ app.post('/api/create-template', async (req, res) => {
     logToFile(`Full Request Body: ${JSON.stringify(req.body, null, 2)}`);
     logToFile('==========================================');
 
-    // Build form data using FormData for multipart/form-data
+    // Build form data using FormData for multipart/form-data (matching exact working Postman request)
     const formData = new FormData();
     
-    // Add required fields (matching your API request format)
+    // Add required fields in exact order as working request
     formData.append('userid', userId);
     formData.append('wabaNumber', wabaNumber);
     formData.append('output', 'json');
-    formData.append('templateName', templateName);
+    formData.append('msgType', msgType || 'text');
     
-    // Add optional fields with proper defaults
+    // Add template content fields
+    if (footer) formData.append('footer', footer);
+    if (body) formData.append('body', body);
+    if (bodySample) formData.append('bodySample', bodySample);
+    
+    // Add template metadata
+    formData.append('templateName', templateName);
     formData.append('templateDescription', templateDescription || templateName);
     formData.append('language', language || 'en');
     formData.append('category', category || 'MARKETING');
-    formData.append('msgType', msgType || 'text');
     
-    // Add template content
-    if (body) formData.append('body', body);
-    if (bodySample) formData.append('bodySample', bodySample);
-    if (footer) formData.append('footer', footer);
-    
-    // Handle media templates (matching your API request structure)
+    // Handle media templates (matching your working API request structure)
     if (msgType === 'media') {
       const headerSampleFile = req.body.headerSampleFile || req.body.headerFile;
       
@@ -374,7 +374,7 @@ app.post('/api/create-template', async (req, res) => {
         });
       }
       
-      // Add media-specific fields (matching your API format)
+      // Add media-specific fields (matching your working API format exactly)
       formData.append('mediaType', mediaType || 'image');
       formData.append('headerSampleFile', headerSampleFile.trim());
       
