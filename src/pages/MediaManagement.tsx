@@ -271,31 +271,88 @@ const MediaManagement: React.FC = () => {
       return;
     }
 
+    if (!mediaItem.media_id) {
+      toast.error('Media ID not available');
+      return;
+    }
+
     try {
       const response = await fetch(`http://localhost:3001/api/download-media?userId=${client.user_id}&mediaId=${mediaItem.media_id}`, {
         method: 'GET'
       });
 
-      if (response.ok) {
-        // Create blob and download
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = mediaItem.name || `media_${mediaItem.media_id}`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        toast.success('Media downloaded successfully');
-      } else {
+      if (!response.ok) {
+        // Try to get error message from response
+        let errorMessage = 'Failed to download media';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorData.details || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        toast.error(errorMessage);
+        return;
+      }
+
+      // Check if response is actually a file (not JSON error)
+      const contentType = response.headers.get('content-type') || '';
+      
+      if (contentType.includes('application/json')) {
+        // Response is JSON (likely an error)
         const data = await response.json();
         toast.error(data.error || 'Failed to download media');
+        return;
       }
-    } catch (error) {
+
+      // Create blob and download
+      const blob = await response.blob();
+      
+      if (blob.size === 0) {
+        toast.error('Downloaded file is empty');
+        return;
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      
+      // Get filename from content-disposition header or use media name
+      const contentDisposition = response.headers.get('content-disposition') || '';
+      let filename = mediaItem.name || `media_${mediaItem.media_id}`;
+      
+      if (contentDisposition.includes('filename=')) {
+        const extractedFilename = contentDisposition.split('filename=')[1].replace(/"/g, '').trim();
+        if (extractedFilename) {
+          filename = extractedFilename;
+        }
+      }
+      
+      // Add appropriate extension if not present
+      if (!filename.includes('.')) {
+        const extension = mediaItem.media_type === 'image' ? '.jpg' 
+          : mediaItem.media_type === 'video' ? '.mp4'
+          : mediaItem.media_type === 'audio' ? '.mp3'
+          : mediaItem.media_type === 'document' ? '.pdf'
+          : '.bin';
+        filename += extension;
+      }
+      
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Media downloaded successfully');
+    } catch (error: any) {
       console.error('Error downloading media:', error);
-      toast.error('Failed to download media. Please try again.');
+      toast.error(error.message || 'Failed to download media. Please try again.');
     }
+  };
+
+  // Get media preview URL (for viewing/preview)
+  const getMediaPreviewUrl = (mediaItem: any) => {
+    if (!client || !mediaItem.media_id) return null;
+    return `http://localhost:3001/api/view-media?userId=${client.user_id}&mediaId=${mediaItem.media_id}`;
   };
 
   if (!client) {
@@ -583,12 +640,58 @@ const MediaManagement: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* Media Preview */}
+              {mediaItem.media_type === 'image' && getMediaPreviewUrl(mediaItem) ? (
+                <div className="w-full h-48 bg-muted rounded-lg overflow-hidden mb-3 relative">
+                  <img
+                    src={getMediaPreviewUrl(mediaItem) || ''}
+                    alt={mediaItem.name}
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => {
+                      const url = getMediaPreviewUrl(mediaItem);
+                      if (url) {
+                        window.open(url, '_blank');
+                      }
+                    }}
+                    onError={(e) => {
+                      // Fallback if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-muted hidden" id={`fallback-${mediaItem.id}`}>
+                    <Image className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                </div>
+              ) : mediaItem.media_type === 'document' ? (
+                <div className="w-full h-48 bg-muted rounded-lg overflow-hidden mb-3 flex items-center justify-center">
+                  <div className="text-center">
+                    <FileText className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">{mediaItem.name}</p>
+                  </div>
+                </div>
+              ) : mediaItem.media_type === 'video' ? (
+                <div className="w-full h-48 bg-muted rounded-lg overflow-hidden mb-3 flex items-center justify-center">
+                  <div className="text-center">
+                    <Video className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">Video File</p>
+                  </div>
+                </div>
+              ) : mediaItem.media_type === 'audio' ? (
+                <div className="w-full h-48 bg-muted rounded-lg overflow-hidden mb-3 flex items-center justify-center">
+                  <div className="text-center">
+                    <Music className="h-16 w-16 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">Audio File</p>
+                  </div>
+                </div>
+              ) : null}
+
               <div>
                 <h3 className="font-semibold text-sm truncate" title={mediaItem.name}>
                   {mediaItem.name}
                 </h3>
                 {mediaItem.description && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                     {mediaItem.description}
                   </p>
                 )}

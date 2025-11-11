@@ -803,6 +803,72 @@ app.delete('/api/delete-media', async (req, res) => {
   }
 });
 
+// Helper function to fetch media from API
+const fetchMediaFromAPI = async (userId, mediaId) => {
+  const { data: clientData, error: clientError } = await supabase
+    .from('client_users')
+    .select('whatsapp_api_key')
+    .eq('user_id', userId)
+    .single();
+
+  if (clientError || !clientData) {
+    throw new Error('Failed to get client credentials');
+  }
+
+  const apiKey = clientData.whatsapp_api_key;
+  const url = `https://theultimate.io/WAApi/media?userid=${userId}&output=json&mediaId=${mediaId}&download=true`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'apiKey': apiKey,
+      'Cookie': 'SERVERID=webC1'
+    }
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Failed to fetch media: ${errorText}`);
+  }
+
+  return response;
+};
+
+// Proxy endpoint for viewing media (for previews)
+app.get('/api/view-media', async (req, res) => {
+  try {
+    const { userId, mediaId } = req.query;
+    
+    if (!userId || !mediaId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    logToFile('=== VIEW MEDIA API REQUEST DETAILS ===');
+    logToFile(`User ID: ${userId}`);
+    logToFile(`Media ID: ${mediaId}`);
+    logToFile('==========================================');
+
+    const response = await fetchMediaFromAPI(userId, mediaId);
+
+    // Get the content type from headers
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+    const buffer = await response.arrayBuffer();
+
+    // Set appropriate headers for viewing (inline, not attachment)
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Content-Length', buffer.byteLength);
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+
+    // Send the file
+    res.send(Buffer.from(buffer));
+
+  } catch (error) {
+    logToFile(`View media error: ${error.message}`);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
 // Proxy endpoint for downloading media
 app.get('/api/download-media', async (req, res) => {
   try {
@@ -817,32 +883,7 @@ app.get('/api/download-media', async (req, res) => {
     logToFile(`Media ID: ${mediaId}`);
     logToFile('==========================================');
 
-    // Get API key from database
-    const { data: clientData, error: clientError } = await supabase
-      .from('client_users')
-      .select('whatsapp_api_key')
-      .eq('user_id', userId)
-      .single();
-
-    if (clientError || !clientData) {
-      return res.status(400).json({ error: 'Failed to get client credentials' });
-    }
-
-    const apiKey = clientData.whatsapp_api_key;
-
-    const url = `https://theultimate.io/WAApi/media?userid=${userId}&output=json&mediaId=${mediaId}&download=true`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'apiKey': apiKey,
-        'Cookie': 'SERVERID=webC1'
-      }
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return res.status(response.status).json({ error: 'Failed to download media', details: errorText });
-    }
+    const response = await fetchMediaFromAPI(userId, mediaId);
 
     // Get the content type and filename from headers
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
