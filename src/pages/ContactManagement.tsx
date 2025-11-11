@@ -64,6 +64,7 @@ const ContactManagement = () => {
   const [newListForImport, setNewListForImport] = useState({ name: '', description: '' });
   const [creatingListForImport, setCreatingListForImport] = useState(false);
   const [deletingGroup, setDeletingGroup] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('contacts');
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [newContact, setNewContact] = useState({
@@ -625,7 +626,7 @@ const ContactManagement = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="contacts" className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="contacts" className="flex items-center gap-2">
             <Users className="h-4 w-4" />

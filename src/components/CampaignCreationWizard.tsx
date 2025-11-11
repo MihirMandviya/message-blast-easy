@@ -862,6 +862,7 @@ export default function CampaignCreationWizard({ onCampaignCreated, onClose }: C
         user_id: client?.client_id, // Use client_id to reference clients table
         client_id: client?.id, // Use client_users.id for client_id
         created_by: client?.id, // Use client_users.id for created_by (who created this campaign)
+        added_by: client?.id, // Use client_users.id for added_by (required field)
         group_id: groupId,
         template_id: formData.template_id,
         status: campaignStatus,

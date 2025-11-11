@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, RefreshCw, Search, MessageSquare, FileText, Image, Video, Music, Calendar, Clock, Globe, Tag, Plus, Trash2 } from 'lucide-react';
+import { Loader2, RefreshCw, Search, MessageSquare, FileText, Image, Video, Music, Calendar, Clock, Globe, Tag, Plus, Trash2, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import CreateTemplateForm from '@/components/CreateTemplateForm';
+import TemplateViewModal from '@/components/TemplateViewModal';
 import { toast } from 'sonner';
 
 const TemplateManagement: React.FC = () => {
@@ -22,6 +23,8 @@ const TemplateManagement: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useState<string>('all');
   const [selectedMediaType, setSelectedMediaType] = useState<string>('all');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [showViewModal, setShowViewModal] = useState(false);
 
   const filteredTemplates = useMemo(() => {
     let filtered = templates;
@@ -169,6 +172,16 @@ const TemplateManagement: React.FC = () => {
       console.error('Error deleting template:', error);
       toast.error('Failed to delete template. Please try again.');
     }
+  };
+
+  const handleViewTemplate = (template: any) => {
+    setSelectedTemplate(template);
+    setShowViewModal(true);
+  };
+
+  const handleCloseViewModal = () => {
+    setShowViewModal(false);
+    setSelectedTemplate(null);
   };
 
   const handleDeleteAllTemplates = async () => {
@@ -413,19 +426,19 @@ const TemplateManagement: React.FC = () => {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          <TemplateGrid templates={filteredTemplates} onDeleteTemplate={handleDeleteTemplate} />
+          <TemplateGrid templates={filteredTemplates} onDeleteTemplate={handleDeleteTemplate} onViewTemplate={handleViewTemplate} />
         </TabsContent>
         <TabsContent value="marketing" className="space-y-4">
-          <TemplateGrid templates={templatesByCategory.marketing} onDeleteTemplate={handleDeleteTemplate} />
+          <TemplateGrid templates={templatesByCategory.marketing} onDeleteTemplate={handleDeleteTemplate} onViewTemplate={handleViewTemplate} />
         </TabsContent>
         <TabsContent value="utility" className="space-y-4">
-          <TemplateGrid templates={templatesByCategory.utility} onDeleteTemplate={handleDeleteTemplate} />
+          <TemplateGrid templates={templatesByCategory.utility} onDeleteTemplate={handleDeleteTemplate} onViewTemplate={handleViewTemplate} />
         </TabsContent>
         <TabsContent value="english" className="space-y-4">
-          <TemplateGrid templates={templatesByLanguage.english} onDeleteTemplate={handleDeleteTemplate} />
+          <TemplateGrid templates={templatesByLanguage.english} onDeleteTemplate={handleDeleteTemplate} onViewTemplate={handleViewTemplate} />
         </TabsContent>
         <TabsContent value="marathi" className="space-y-4">
-          <TemplateGrid templates={templatesByLanguage.marathi} onDeleteTemplate={handleDeleteTemplate} />
+          <TemplateGrid templates={templatesByLanguage.marathi} onDeleteTemplate={handleDeleteTemplate} onViewTemplate={handleViewTemplate} />
         </TabsContent>
       </Tabs>
 
@@ -445,15 +458,25 @@ const TemplateManagement: React.FC = () => {
       )}
         </>
       )}
+
+      {/* Template View Modal */}
+      {showViewModal && (
+        <TemplateViewModal
+          template={selectedTemplate}
+          onClose={handleCloseViewModal}
+        />
+      )}
     </div>
   );
 };
 
 interface TemplateGridProps {
   templates: any[];
+  onDeleteTemplate: (template: any) => void;
+  onViewTemplate: (template: any) => void;
 }
 
-const TemplateGrid: React.FC<TemplateGridProps> = ({ templates, onDeleteTemplate }: { templates: any[], onDeleteTemplate: (template: any) => void }) => {
+const TemplateGrid: React.FC<TemplateGridProps> = ({ templates, onDeleteTemplate, onViewTemplate }) => {
   const getMediaTypeIcon = (type: string) => {
     switch (type) {
       case 'text':
@@ -575,8 +598,17 @@ const TemplateGrid: React.FC<TemplateGridProps> = ({ templates, onDeleteTemplate
               </div>
             </div>
             
-                         {/* Delete Button */}
-             <div className="pt-2 border-t flex justify-end">
+                         {/* Action Buttons */}
+             <div className="pt-2 border-t flex justify-end space-x-2">
+               <Button
+                 onClick={() => onViewTemplate(template)}
+                 variant="ghost"
+                 size="sm"
+                 className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                 title="View template details"
+               >
+                 <Eye className="h-4 w-4" />
+               </Button>
                <Button
                  onClick={() => onDeleteTemplate(template)}
                  variant="ghost"

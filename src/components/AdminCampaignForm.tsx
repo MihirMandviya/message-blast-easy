@@ -320,6 +320,7 @@ export default function AdminCampaignForm({ clientId, onCampaignCreated }: Admin
         user_id: clientId, // Use the client organization ID
         client_id: clientUser.id, // Use the primary client user ID
         created_by: admin?.id, // Set created_by to the admin (who created this campaign)
+        added_by: admin?.id, // Set added_by to the admin (required field)
         group_id: formData.group_id,
         template_id: formData.template_id,
         status: campaignStatus,
